@@ -16,6 +16,12 @@ const environment = {
   REDIS_URL: process.env.TEST_REDIS_URL ?? 'redis://127.0.0.1:6379',
   DOCUMENT_KEY: 'a'.repeat(64),
   PAYMENT_WEBHOOK_SECRET: 'test-webhook-secret-never-use-in-production',
+  MESA_TEST_COMPLEMENTS: '1',
+  MERCADO_PAGO_CLIENT_ID: '123456789',
+  MERCADO_PAGO_CLIENT_SECRET: 'e2e-client-secret-never-production',
+  MERCADO_PAGO_WEBHOOK_SECRET: 'e2e-webhook-secret-never-production',
+  MERCADO_PAGO_REDIRECT_URI: 'http://127.0.0.1:35173/api/v1/complements/mercadopago/callback',
+  ADMIN_PUBLIC_URL: 'http://127.0.0.1:35173',
 };
 export default defineConfig({
   testDir: './tests/e2e',

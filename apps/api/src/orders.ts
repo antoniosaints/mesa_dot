@@ -152,7 +152,7 @@ export async function createOrder(
     if (line.variant_id) {
       variant = await s.get('product_variants', line.variant_id);
       ensure(
-        variant.product_id === product.id && variant.enabled,
+        variant.product_id === product.id && variant.enabled && !variant.deleted_at,
         'BAD_REQUEST',
         'Variação inválida.',
         400,
@@ -194,7 +194,7 @@ export async function createOrder(
       product_id: product.id,
       variant_id: variant?.id ?? null,
       quantity: line.quantity,
-      name_snapshot: `${product.name}${variant ? ` - ${variant.name}` : ''}`,
+      name_snapshot: `${product.name}${variant ? ` - ${variant.name}` : product.default_variant_name && product.default_variant_name !== 'Padrão' ? ` - ${product.default_variant_name}` : ''}`,
       unit_price: formatDecimal(price),
       total: formatDecimal(lineTotal),
       stock_policy_snapshot: product.stock_policy,

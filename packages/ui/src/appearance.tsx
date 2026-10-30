@@ -6,6 +6,7 @@ import { useEffect, useState, useSyncExternalStore } from 'react';
 import type { ReactNode } from 'react';
 import {
   Gauge,
+  Puzzle,
   PanelsTopLeft,
   ClipboardList,
   UtensilsCrossed,
@@ -54,6 +55,7 @@ import {
   ShoppingCart,
 } from 'lucide-react';
 const icons = {
+  complements: Puzzle,
   dashboard: Gauge,
   tables: PanelsTopLeft,
   orders: ClipboardList,

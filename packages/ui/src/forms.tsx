@@ -26,7 +26,7 @@ export interface Field {
   required?: boolean;
   initial?: any;
   placeholder?: string;
-  hint?: string;
+  hint?: string | ((values: Data) => string);
   minLength?: number;
   maxLength?: number;
   min?: number;
@@ -181,7 +181,11 @@ export function FormFields({
                 }
               />
             )}
-            {field.hint && <small className="field-hint">{field.hint}</small>}
+            {field.hint && (
+              <small className="field-hint">
+                {typeof field.hint === 'function' ? field.hint(values) : field.hint}
+              </small>
+            )}
           </label>
         ),
       )}

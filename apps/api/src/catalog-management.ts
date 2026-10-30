@@ -5,6 +5,7 @@ export async function validateCatalogResource(s: Scope, path: string, data: Row,
   if (path === 'products' || path === 'product-variants') {
     if (next.stock_location_id) await s.get('stock_locations', next.stock_location_id);
     if (path === 'product-variants') {
+      ensure(!current?.deleted_at, 'NOT_FOUND', 'Variação removida.', 404);
       if (current)
         ensure(
           current.product_id === next.product_id,
@@ -21,8 +22,12 @@ export async function validateCatalogResource(s: Scope, path: string, data: Row,
       );
     } else if (next.stock_policy === 'RECIPE' && current)
       ensure(
-        !(await s.list('product_variants', sql`product_id=${current.id} AND stock_mode='OWN'`))
-          .length,
+        !(
+          await s.list(
+            'product_variants',
+            sql`product_id=${current.id} AND stock_mode='OWN' AND deleted_at IS NULL`,
+          )
+        ).length,
         'BAD_REQUEST',
         'Altere as variações para estoque compartilhado antes de ativar a ficha técnica.',
         400,
@@ -33,6 +38,11 @@ export async function validateCatalogResource(s: Scope, path: string, data: Row,
     await s.get('stock_locations', next.location_id);
     if (next.variant_id) {
       const variant = await s.get('product_variants', next.variant_id);
+      ensure(
+        !variant.deleted_at,
+        'INVALID_STATE',
+        'Não é possível vincular estoque a uma variação removida.',
+      );
       ensure(
         variant.product_id === next.product_id,
         'BAD_REQUEST',
@@ -90,24 +100,48 @@ export async function productManagement(s: Scope, id: string) {
   const ids = new Set(balances.map((b) => b.id));
   const recipeIds = new Set(recipes.map((r) => r.id));
   return {
+    default_variant: {
+      id: null,
+      product_id: id,
+      name: product.default_variant_name,
+      stock_mode: 'SHARED',
+      is_default: true,
+      removable: false,
+      ...(catalog ? { price: product.price } : {}),
+    },
+    variant_count: 1 + variants.filter((v) => !v.deleted_at).length,
     product: catalog
       ? product
       : {
           id: product.id,
           name: product.name,
+          default_variant_name: product.default_variant_name,
+          unit_code: product.unit_code,
           enabled: product.enabled,
           stock_policy: product.stock_policy,
           stock_location_id: product.stock_location_id,
         },
     variants: catalog
+      ? variants.filter((v) => !v.deleted_at)
+      : variants
+          .filter((v) => !v.deleted_at)
+          .map((v) => ({
+            id: v.id,
+            name: v.name,
+            stock_mode: v.stock_mode,
+            stock_location_id: v.stock_location_id,
+            enabled: v.enabled,
+          })),
+    archived_variants: stock
       ? variants
-      : variants.map((v) => ({
-          id: v.id,
-          name: v.name,
-          stock_mode: v.stock_mode,
-          stock_location_id: v.stock_location_id,
-          enabled: v.enabled,
-        })),
+          .filter((v) => v.deleted_at)
+          .map((v) => ({
+            id: v.id,
+            name: v.name,
+            deleted_at: v.deleted_at,
+            stock_mode: v.stock_mode,
+          }))
+      : [],
     balances,
     locations,
     movements: movements.filter((m) => ids.has(m.balance_id)),
@@ -120,10 +154,35 @@ export async function productManagement(s: Scope, id: string) {
     ingredients: products.map((p) => ({
       id: p.id,
       name: p.name,
+      unit_code: p.unit_code,
       stock_policy: p.stock_policy,
       stock_location_id: p.stock_location_id,
     })),
   };
+}
+export async function removeProductVariant(s: Scope, id: string) {
+  permit(s.actor, 'catalog.manage');
+  const variant = await s.get('product_variants', id, true);
+  if (variant.deleted_at) return { id, removed: true };
+  const product = await s.get('products', variant.product_id);
+  ensure(
+    Boolean(product.default_variant_name?.trim()),
+    'INVALID_STATE',
+    'O produto deve manter ao menos a variação padrão.',
+  );
+  const balances = await s.list(
+    'stock_balances',
+    sql`variant_id=${id} AND (physical_quantity<>0 OR reserved_quantity<>0)`,
+  );
+  ensure(
+    !balances.length,
+    'INVALID_STATE',
+    'Esta variação ainda possui saldo ou reservas de estoque. Conclua as entregas e ajuste ou transfira o saldo antes de remover.',
+  );
+  await s.update('product_variants', id, { enabled: false, deleted_at: new Date() });
+  await s.audit('product-variants.removed', id, { product_id: product.id, name: variant.name });
+  await s.event('product-variants.updated', id);
+  return { id, removed: true };
 }
 export async function makeDefaultStockLocation(s: Scope, id: string) {
   permit(s.actor, 'inventory.adjust');

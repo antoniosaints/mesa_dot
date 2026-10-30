@@ -1,60 +1,110 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { api, type Data } from './client.js';
 import { Icon } from './appearance.js';
+import { TableLoading } from './pagination.js';
 import { Modal, ModalCloseButton, useAction, useRefresh } from './common.js';
-export function PrintStationsPanel() {
+export function PrintStationsPanel({
+  transport = 'PRINTBRIDGE',
+  action,
+}: {
+  transport?: 'PRINTBRIDGE' | 'TCP';
+  action?: ReactNode;
+}) {
+  const tcp = transport === 'TCP',
+    title = tcp ? 'Agentes TCP/IP' : 'Computadores de impressão';
   const [stations, setStations] = useState<Data[]>([]),
     [error, setError] = useState(''),
-    [selected, setSelected] = useState<Data | null>(null);
+    [selected, setSelected] = useState<Data | null>(null),
+    [loading, setLoading] = useState(true);
   const { run, busy } = useAction();
   async function load() {
     try {
-      setStations(await api('/print/stations'));
+      setStations(
+        (await api('/print/stations')).filter((station: Data) => station.transport === transport),
+      );
       setError('');
     } catch (error) {
       setError((error as Error).message);
+    } finally {
+      setLoading(false);
     }
   }
-  useRefresh(load, []);
+  useRefresh(load, [transport]);
   useEffect(() => {
     const timer = setInterval(() => void load(), 10000);
     return () => clearInterval(timer);
-  }, []);
+  }, [transport]);
   return (
-    <section className="print-stations-panel" aria-label="Computadores de impressão">
+    <section className="print-stations-panel" aria-label={title}>
       <div className="section-head">
         <div>
           <h3>
             <Icon name="printing" size={18} />
-            Computadores de impressão
+            {title}
           </h3>
           <p className="field-hint">
-            O celular envia pela internet para os computadores ativos desta unidade.
+            {tcp
+              ? 'Integração opcional com impressoras de rede via ESC/POS. Não é necessária para usar o PrintBridge.'
+              : 'Computadores configurados pelo PrintBridge recebem a fila desta filial, inclusive os envios feitos pelo celular.'}
           </p>
         </div>
-        <button onClick={() => void load()}>
-          <Icon name="refresh" size={16} />
-          Atualizar estações
-        </button>
+        <div className="button-row">
+          {action}
+          <button onClick={() => void load()}>
+            <Icon name="refresh" size={16} />
+            Atualizar estações
+          </button>
+        </div>
       </div>
       {error && (
         <p className="alert error" role="alert">
           {error}
         </p>
       )}
-      {!stations.length ? (
-        <p className="field-hint">
-          Nenhum agente cadastrado. Conecte e ative este computador para começar.
-        </p>
+      {loading ? (
+        <TableLoading
+          label={tcp ? 'Carregando agentes TCP/IP…' : 'Carregando computadores de impressão…'}
+        />
+      ) : !stations.length ? (
+        error ? null : (
+          <p className="field-hint">
+            {tcp
+              ? 'Nenhum agente TCP/IP cadastrado. Crie uma credencial somente se for executar o programa agente na rede da impressora.'
+              : 'Nenhum computador PrintBridge cadastrado. Conecte o PrintBridge, vincule as impressoras e ative a fila local; o cadastro é automático.'}
+          </p>
+        )
       ) : (
         stations.map((station) => (
           <article key={station.id} className="print-station-row">
             <div>
               <strong>{station.name}</strong>
-              <span className={'badge ' + (station.online ? 'available' : 'pending')}>
-                {!station.enabled ? 'Desativado' : station.online ? 'Online' : 'Offline'}
+              <span
+                className={
+                  'badge ' +
+                  (!station.enabled ? 'cancelled' : station.online ? 'available' : 'pending')
+                }
+              >
+                {!station.enabled
+                  ? 'Desativado'
+                  : station.online
+                    ? 'Online'
+                    : !station.last_seen_at
+                      ? 'Aguardando conexão'
+                      : 'Offline'}
               </span>
-              <small>{station.printer_ids.length} impressora(s) vinculada(s)</small>
+              <small>
+                {tcp ? 'TCP/IP · ESC/POS' : 'PrintBridge'} · {station.printer_ids.length}{' '}
+                impressora(s) vinculada(s)
+              </small>
+              <small>
+                {station.last_seen_at
+                  ? 'Última comunicação: ' +
+                    new Date(
+                      String(station.last_seen_at).replace(' ', 'T') +
+                        (/Z$|[+-]\d{2}:\d{2}$/.test(String(station.last_seen_at)) ? '' : 'Z'),
+                    ).toLocaleString('pt-BR')
+                  : 'O programa ainda não se conectou à fila.'}
+              </small>
             </div>
             <button
               className={station.enabled ? 'danger' : ''}

@@ -7,6 +7,7 @@ export const paymentMethodLabels: Record<string, string> = {
   PIX_MANUAL: 'Pix manual',
   CARD_MANUAL: 'Cartão manual',
   sandbox: 'Online · sandbox',
+  mercadopago: 'Mercado Pago',
 };
 export const paymentMethodLabel = (value: string) => paymentMethodLabels[value] ?? value;
 export const paymentAccepted = (p: Data) =>

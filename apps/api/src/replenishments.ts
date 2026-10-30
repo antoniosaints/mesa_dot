@@ -51,7 +51,7 @@ export async function replenishmentDetail(s: Scope, id: string) {
   const { tenant_id: _tenant, establishment_id: _unit, ...header } = found[0];
   const items = await rows(
     s.tx,
-    sql`SELECT i.id,i.balance_id,i.product_name,i.variant_name,i.location_name,l.color location_color,i.quantity,i.physical_before,i.physical_after,i.unit_cost,i.line_total FROM stock_replenishment_items i JOIN stock_balances b ON b.tenant_id=i.tenant_id AND b.establishment_id=i.establishment_id AND b.id=i.balance_id JOIN stock_locations l ON l.tenant_id=b.tenant_id AND l.establishment_id=b.establishment_id AND l.id=b.location_id WHERE i.tenant_id=${s.actor.tenantId} AND i.establishment_id=${s.actor.establishmentId} AND i.replenishment_id=${id} ORDER BY i.product_name,i.location_name,i.id`,
+    sql`SELECT i.id,i.balance_id,i.product_name,i.variant_name,i.location_name,i.unit_code,l.color location_color,i.quantity,i.physical_before,i.physical_after,i.unit_cost,i.line_total FROM stock_replenishment_items i JOIN stock_balances b ON b.tenant_id=i.tenant_id AND b.establishment_id=i.establishment_id AND b.id=i.balance_id JOIN stock_locations l ON l.tenant_id=b.tenant_id AND l.establishment_id=b.establishment_id AND l.id=b.location_id WHERE i.tenant_id=${s.actor.tenantId} AND i.establishment_id=${s.actor.establishmentId} AND i.replenishment_id=${id} ORDER BY i.product_name,i.location_name,i.id`,
   );
   return { ...header, items };
 }
@@ -83,9 +83,15 @@ export async function createReplenishment(s: Scope, input: z.infer<typeof replen
     const product = await s.get('products', balance.product_id),
       location = await s.get('stock_locations', balance.location_id);
     const variant = balance.variant_id ? await s.get('product_variants', balance.variant_id) : null;
+    ensure(
+      !variant?.deleted_at,
+      'INVALID_STATE',
+      'Esta variação foi removida. Escolha um estoque de uma variação disponível.',
+    );
     stocks.set(item.balance_id, {
       ...balance,
       product_name: product.name,
+      unit_code: product.unit_code,
       location_name: location.name,
       variant_name: variant?.name ?? null,
     });
@@ -117,6 +123,7 @@ export async function createReplenishment(s: Scope, input: z.infer<typeof replen
       replenishment_id: header.id,
       balance_id: balance.id,
       product_name: balance.product_name,
+      unit_code: balance.unit_code,
       variant_name: balance.variant_name,
       location_name: balance.location_name,
       quantity: item.quantity,

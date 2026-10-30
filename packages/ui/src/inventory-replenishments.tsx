@@ -1,3 +1,4 @@
+import { unitSymbol } from '../../shared/src/measurement-units.js';
 import { NumericInput } from './numeric-input.js';
 import { RecordTag } from './record-tags.js';
 import { useEffect, useRef, useState } from 'react';
@@ -44,13 +45,16 @@ export function ReplenishmentModal({
     ),
     variants = new Map<string, Data>((catalog.variants ?? []).map((item: Data) => [item.id, item])),
     locations: Data[] = catalog.locations ?? [];
-  const described: Data[] = balances.map((balance) => ({
-    ...balance,
-    product_name: products.get(balance.product_id)?.name ?? 'Produto',
-    variant_name: variants.get(balance.variant_id)?.name ?? 'Compartilhado',
-    location_name: locations.find((item) => item.id === balance.location_id)?.name ?? 'Local',
-    location_color: locations.find((item) => item.id === balance.location_id)?.color,
-  }));
+  const described: Data[] = balances
+    .filter((balance) => !variants.get(balance.variant_id)?.deleted_at)
+    .map((balance) => ({
+      ...balance,
+      product_name: products.get(balance.product_id)?.name ?? 'Produto',
+      unit_code: products.get(balance.product_id)?.unit_code ?? 'UN',
+      variant_name: variants.get(balance.variant_id)?.name ?? 'Compartilhado',
+      location_name: locations.find((item) => item.id === balance.location_id)?.name ?? 'Local',
+      location_color: locations.find((item) => item.id === balance.location_id)?.color,
+    }));
   const filtered = described.filter(
     (balance) =>
       (!location || balance.location_id === location) &&
@@ -235,8 +239,8 @@ export function ReplenishmentModal({
             </div>
           </div>
           <p className="field-hint">
-            Até 100 estoques por reposição. Custo unitário de compra é opcional; informe todos os
-            custos para calcular o total.
+            Até 100 estoques por reposição. Custo de compra por medida do produto é opcional;
+            informe todos os custos para calcular o total.
           </p>
           {paging.rows.length ? (
             <div className="data-table">
@@ -280,7 +284,9 @@ export function ReplenishmentModal({
                           </RecordTag>
                         </div>
                       </td>
-                      <td data-label="Físico atual">{stockQuantity(balance.physical_quantity)}</td>
+                      <td data-label="Físico atual">
+                        {stockQuantity(balance.physical_quantity)} {unitSymbol(balance.unit_code)}
+                      </td>
                       <td data-label="Quantidade a repor">
                         <NumericInput
                           label={
@@ -295,7 +301,7 @@ export function ReplenishmentModal({
                           required={Boolean(selected[balance.id])}
                           disabled={!selected[balance.id]}
                           value={selected[balance.id]?.quantity ?? ''}
-                          placeholder="Ex.: 10 ou 1,500"
+                          placeholder={`Quantidade em ${unitSymbol(balance.unit_code)}`}
                           onChange={(value) => update(balance.id, 'quantity', value)}
                         />
                       </td>
@@ -420,9 +426,12 @@ export function ReplenishmentDetail({ record, onClose }: { record: Data; onClose
                       <RecordTag color={item.location_color}>{item.location_name}</RecordTag>
                     </div>
                   </td>
-                  <td data-label="Entrada">+{stockQuantity(item.quantity)}</td>
+                  <td data-label="Entrada">
+                    +{stockQuantity(item.quantity)} {unitSymbol(item.unit_code)}
+                  </td>
                   <td data-label="Físico antes → depois">
-                    {stockQuantity(item.physical_before)} → {stockQuantity(item.physical_after)}
+                    {stockQuantity(item.physical_before)} → {stockQuantity(item.physical_after)}{' '}
+                    {unitSymbol(item.unit_code)}
                   </td>
                   <td data-label="Custo unitário">
                     {item.unit_cost == null ? 'Não informado' : brl(item.unit_cost)}

@@ -30,6 +30,11 @@ export interface ManagementDestination {
   path: string;
 }
 const hints: Record<string, { description: string; keywords: string }> = {
+  complements: {
+    description: 'Instalar e configurar Mercado Pago e Gemini nesta filial.',
+    keywords:
+      'complementos integracoes mercado pago oauth gemini inteligencia artificial ia assistente resumos',
+  },
   overview: {
     description: 'Indicadores e visão geral da filial.',
     keywords: 'inicio dashboard resumo link cliente cardapio online',

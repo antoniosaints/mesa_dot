@@ -32,8 +32,8 @@ Envie `Idempotency-Key: <UUID>` em cada mutação autenticada. A mesma chave dev
 }
 ```
 
-4. `POST /payments/intents` recebe `order_id`; retorna intenção sandbox e reserva temporariamente o estoque.
-5. Em desenvolvimento/teste, `POST /sandbox/pay` com `intent_id` simula aprovação. Em um gateway integrado, somente webhook autenticado/consulta confiável confirma.
+4. `POST /payments/intents` recebe `order_id`, reserva temporariamente o estoque e retorna `provider=mercadopago` e `checkout_url` quando há conexão ativa na filial. Sem integração real, o sandbox interno só está disponível em desenvolvimento/teste e sem credenciais Mercado Pago anteriores.
+5. `GET /payments/intents/:id` consulta o status autorizado; `POST /payments/intents/:id/sync` consulta o Mercado Pago no servidor. O checkout real só confirma por notificação verificada ou essa consulta. `POST /sandbox/pay` simula aprovação apenas de intenções sandbox em desenvolvimento/teste; rejeita intenções reais.
 6. `GET /my-tickets`, `/my-tabs`, `/my-consumption` ressincroniza o estado. Pedidos e fichas ficam associados ao customer autenticado.
 
 O backend recalcula cada valor e valida a disponibilidade. Uma intenção não é pagamento. A confirmação abre a sessão operacional, gera uma ficha por unidade, lança o financeiro e persiste eventos. Não tente confirmar pré-pago pela página de retorno do gateway.
@@ -99,6 +99,29 @@ Caixa: `POST /cash/sessions` recebe `register_id`, `opening_amount`; `POST /cash
 
 ## Webhook sandbox
 
+`POST /webhooks/payments/sandbox` é exclusivo do provedor sandbox. Para integrações reais, consulte a seção Complementos abaixo.
+
+## Variações dos produtos
+
+Para cadastro, edição do nome padrão e remoção lógica das variações adicionais de produtos, veja [Variações dos produtos](variacoes-produtos.md). Todo produto mantém uma opção padrão obrigatória; `DELETE /product-variants/:id` remove somente adicionais e preserva seu histórico.
+
+## Complementos e pagamento Mercado Pago
+
+Somente staff com `isAccountAdmin=true` pode usar `/complements` e suas ações. A autorização é conferida novamente no servidor, inclusive no retorno OAuth. Conexões são isoladas por tenant e estabelecimento.
+
+- `GET /complements`: catálogo com instalação, ativação e estado da conexão; nunca devolve chaves ou tokens.
+- `POST /complements/:provider/install`, `/enable`, `/disable`: `provider=mercadopago|gemini`, corpo `{}` e `Idempotency-Key`.
+- `POST /complements/mercadopago/connect`: retorna `authorization_url` e envia cookie HttpOnly. O navegador segue para o provedor. `GET /complements/mercadopago/callback` valida cookie/state/PKCE e redireciona para a gestão; não aceita confirmação de pagamento.
+- `POST /complements/mercadopago/test`: verifica a conta vinculada.
+- `POST /complements/gemini/configure`: `{api_key?,model,image_model?:string|null}`; omitir a chave preserva a existente. `image_model` omitido preserva a configuração anterior, e `null` remove o modelo separado. Valida disponibilidade e compatibilidade antes de ativar.
+- `POST /complements/gemini/models`: `{api_key?}`; retorna modelos de geração acessíveis à chave nova ou cadastrada. `/test` verifica a conexão existente; `/remove-key` apaga a chave e desativa.
+- `POST /complements/gemini/ask`: `mode=help|summary|description|image`, `question` até 1.500 caracteres (obrigatória exceto resumo), `days=1|7|30`, `focus=operation|finance|stock`, `period?:{start,end}` com datas ISO e até 366 dias, `history?:[{role:user|model,text}]` limitado a oito mensagens/24 mil caracteres, `context?:{kind:product|business,name,description?,category?}` e `aspect_ratio=1:1|4:3|16:9`. Dez solicitações/minuto por sessão. Retorna `answer`, `model`, `generated_at`, `period` e `image:null|{data_url,mime_type}`. O servidor valida saída PNG/JPEG/WebP até 4 MB; não aceita URLs remotas fornecidas como imagem. Não executa alterações. Veja [Assistente IA](assistente-ia.md).
+- `POST /webhooks/payments/mercadopago`: verifica `X-Signature`, `X-Request-Id` e `data.id`, consulta pagamento e estornos na API do provedor e concilia de forma idempotente. Notificações inválidas são rejeitadas; redirecionamentos do cliente nunca aprovam pagamentos. A assinatura é própria do Mercado Pago, diferente do HMAC do sandbox.
+
+`GET /payments/intents/:id` e `POST /payments/intents/:id/sync` exigem acesso ao pedido. O segundo consulta pagamentos e estornos no provedor. `/payments/:id/refund` exige `payment.refund` e confirma o estorno real antes de registrá-lo. Instruções de ambiente e homologação em [Complementos](complementos.md).
+
+## Assinatura do webhook sandbox
+
 `POST /webhooks/payments/sandbox` recebe `event_id`, `reference` da intenção, `amount` string, `status=APPROVED|FAILED` e `settled` boolean. Headers `X-Timestamp` em segundos Unix e `X-Signature` hexadecimal HMAC-SHA256 com `PAYMENT_WEBHOOK_SECRET`, calculado sobre `timestamp + '.' + bytes_originais_do_corpo`.
 
 Eventos repetidos não recapturam nem reemitem fichas. Divergência de valor e conteúdo conflitante são rejeitados. Aprovação com conflito operacional fica em `payments.review_reason`; não se perde o pagamento.
@@ -106,6 +129,8 @@ Eventos repetidos não recapturam nem reemitem fichas. Divergência de valor e c
 ## Cadastro, estoque e configuração
 
 Recursos administrativos usam GET/POST/PATCH: `/areas`, `/categories`, `/products`, `/product-variants`, `/modifier-groups`, `/modifiers`, `/product-modifiers`, `/availability-rules`, `/recipes`, `/recipe-items`, `/stock-locations`, `/printers`, `/cash-registers`, `/floor-layouts`. O OpenAPI descreve os campos. Saldo novo é cadastrado em `POST /stock-balances` com produto e local; mudanças físicas passam exclusivamente por `/inventory/adjustments`.
+
+`POST /products` e `PATCH /products/:id` aceitam `photo_base64` opcional: PNG RGB/RGBA de 8 bits sem entrelaçamento, até 1024 × 1024 pixels e 1,5 MB (base64 até 2 milhões de caracteres). `null` remove; omitir preserva. A foto e os dados são salvos na mesma transação com `catalog.manage` e `Idempotency-Key`. A resposta e os catálogos contêm apenas `photo_revision`, sem binário. `GET /api/v1/product-photos/:unit/:product/:revision/:file` serve `thumbnail.png` ou `photo.png`, com escopo da filial e cache por revisão. A imagem é pública, como parte do cardápio. Veja [Fotos dos produtos](fotos-produtos.md).
 
 `GET /inventory/balances`, `/inventory/movements`. Ajustes recebem `balance_id`, `quantity` em milésimos (ex. `-1.000`), `type=PURCHASE|LOSS|ADJUSTMENT|COUNT`, `reason`. COUNT representa o físico contado; os demais são variações. Ajuste não pode consumir reserva existente.
 
@@ -230,3 +255,36 @@ Toda a operação ocorre na mesma transação e usa as validações existentes d
 `GET /tables/:id/qr?format=A4|LABEL|80|58` devolve o documento `TABLE_QR` com nome do estabelecimento, mesa e URL pública. `GET /tables/:id/qr.pdf` usa os mesmos formatos: A4 com marca de recorte, etiqueta 80 × 100 mm, térmica 80 ou 58 mm. Exige `table.view`, mesa ativa e escopo da unidade. O servidor monta o link a partir de `CUSTOMER_PUBLIC_URL` (ou `VITE_CUSTOMER_URL`), slug atual e código público da mesa; o cliente não pode enviar uma URL arbitrária. Em produção, configure o endereço público do cardápio. Não incorpora tokens nem código de participação e não cria atendimento.
 
 `POST /tables/:id/qr/print` recebe `{printer_id,paper_width:58|80}`, exige `table.view` e `Idempotency-Key` e cria um trabalho `TABLE_QR` na fila existente. `GET /tables/qr/jobs/:id` acompanha o resultado. A migração `0017_table_qr_printing.sql` adiciona snapshot e referência com FK composta, mantendo exclusivos os campos de ficha, cupom e QR. O agente TCP imprime QR ESC/POS; o PrintBridge aceita PDF e ESC/POS. O snapshot é imutável, inclusive após renomear a mesa; retomada, novas vias, cancelamento e resultado incerto usam os controles existentes. Emitir novamente preserva o código público e os pedidos da mesa.
+
+## Perfil comercial da filial
+
+`GET /api/v1/settings` e `PATCH /api/v1/settings` mantêm a autorização `settings.update`. A propriedade opcional `business_profile` contém `description`, `phone`, `email`, `postal_code`, `street`, `number`, `complement`, `neighborhood`, `city` e `state`. São strings; descrição aceita até 1.000 caracteres, telefone exige 10 ou 11 dígitos com DDD e CEP exige 8 dígitos. Campos vazios são aceitos para remover informações opcionais. UF deve ser uma sigla brasileira válida, normalizada para maiúsculas. E-mail é normalizado para minúsculas. Campos inesperados são rejeitados.
+
+O PATCH aceita parte do perfil e preserva os campos omitidos. O merge acontece sob lock da filial autenticada e na mesma transação da auditoria/evento de configuração. Não é aceito um tenant/unidade arbitrário dentro do perfil.
+
+```json
+{
+  "business_profile": {
+    "description": "Cozinha da casa e pratos preparados na hora.",
+    "phone": "11999998888",
+    "email": "contato@example.com",
+    "postal_code": "01001000",
+    "street": "Rua do Restaurante",
+    "number": "S/N",
+    "city": "São Paulo",
+    "state": "SP"
+  }
+}
+```
+
+`GET /api/v1/public/:slug/menu` expõe esse perfil em `establishment.business_profile`, com uma lista explícita dos campos comerciais, sem configurações internas ou dados de autenticação. Registros legados retornam o perfil vazio. Cada filial mantém seus próprios valores. Veja [Configurações](configuracoes.md).
+
+## Unidades de medida dos produtos
+
+`GET /api/v1/measurement-units` retorna o catálogo padrão para usuários autenticados: `code`, `name` e `symbol`. As 13 medidas já vêm cadastradas pela migration `0025_product_measurement_units.sql`: UN (unidade), KG, G, MG, L, ML, DZ (dúzia), CX (caixa), PCT (pacote), FD (fardo), GRF (garrafa), LT (lata) e PR (porção).
+
+`POST /products` e `PATCH /products/:id` aceitam `unit_code`, com a permissão existente `catalog.manage` e escopo da filial. O padrão na criação e nos produtos anteriores é `UN`. Omitir o campo em um PATCH preserva a unidade atual. Códigos desconhecidos, vazios, nulos ou com caixa incorreta são rejeitados pela API; a FK de produtos também restringe o valor ao catálogo de medidas.
+
+A unidade é exibida no cadastro, nos estoques e na reposição. As variações herdam a unidade do produto. Na ficha técnica, a quantidade é informada na medida do ingrediente, para cada item vendido do produto final: por exemplo, `0.050` de um ingrediente em KG representa 0,050 kg por item. Pedidos e fichas continuam contados por item; não foi introduzida venda fracionada nem conversão automática entre kg/g, L/ml ou embalagens.
+
+Alterar a unidade não converte os números existentes. Revise saldos, reservas e receitas antes de salvar. Cada nova movimentação e item de reposição guarda `unit_code` no momento do registro; o histórico mantém essa medida após alterar o produto. Registros anteriores à migration começam em `UN`. Aplique a migration antes de iniciar a API atualizada.

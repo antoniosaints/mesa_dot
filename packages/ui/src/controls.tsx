@@ -9,6 +9,7 @@ import {
   useState,
   type ReactElement,
   type ReactNode,
+  type ComponentProps,
 } from 'react';
 import { createPortal } from 'react-dom';
 import { Icon } from './appearance.js';
@@ -286,6 +287,7 @@ export interface TabProps {
   id: string;
   label: string;
   count?: number;
+  icon: ComponentProps<typeof Icon>['name'];
   children: ReactNode;
 }
 export function Tab({ children }: TabProps) {
@@ -310,7 +312,7 @@ export function Tabs({ children, label }: { children: ReactNode; label: string }
   const refs = useRef<(HTMLButtonElement | null)[]>([]);
   return (
     <div className="tabs-group">
-      <div className="section-tabs" role="tablist" aria-label={label}>
+      <div className="section-tabs system-tabs" role="tablist" aria-label={label}>
         {tabs.map((tab, index) => (
           <button
             key={tab.props.id}
@@ -336,8 +338,11 @@ export function Tabs({ children, label }: { children: ReactNode; label: string }
               refs.current[next]?.focus();
             }}
           >
+            <Icon name={tab.props.icon} size={16} />
             {tab.props.label}
-            {tab.props.count !== undefined && <span>{tab.props.count}</span>}
+            {tab.props.count !== undefined && (
+              <span className="system-tab-count">{tab.props.count}</span>
+            )}
           </button>
         ))}
       </div>

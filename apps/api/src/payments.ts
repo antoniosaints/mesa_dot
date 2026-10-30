@@ -1,3 +1,5 @@
+import { complement } from './complement-store.js';
+import { createMercadoCheckout, mercadoConfigured, refundMercado } from './mercadopago.js';
 import { sql, type Scope, type Row } from '../../../packages/database/src/index.js';
 import { ensure, permit, money, formatDecimal } from '../../../packages/shared/src/index.js';
 import { env } from '../../../packages/shared/src/config.js';
@@ -52,11 +54,21 @@ export async function approvedForOrder(s: Scope, orderId: string) {
   return amount;
 }
 export async function createIntent(s: Scope, orderId: string) {
+  const connection = await complement(s, 'mercadopago');
+  const real = Boolean(connection?.enabled && connection.credentials);
   ensure(
-    env.NODE_ENV !== 'production',
+    real || (env.NODE_ENV !== 'production' && !connection?.credentials),
     'INVALID_STATE',
-    'Configure um adaptador de gateway real antes de receber pagamentos em produção.',
+    'Pagamento online indisponível. Peça ao administrador para ativar o Mercado Pago em Complementos.',
+    409,
   );
+  if (real)
+    ensure(
+      mercadoConfigured(),
+      'INVALID_STATE',
+      'Mercado Pago temporariamente indisponível. Contate o administrador.',
+      409,
+    );
   const order = await accessOrder(s, orderId);
   ensure(
     order.status === 'PENDING_PAYMENT' && order.payment_policy_snapshot === 'PREPAID',
@@ -71,21 +83,24 @@ export async function createIntent(s: Scope, orderId: string) {
       'INVALID_STATE',
       'Intenção já processada ou expirada.',
     );
-    return previous[0];
+    return { ...previous[0], sandbox: previous[0].provider === 'sandbox' };
   }
   await holdOrder(s, order);
   const intent = await s.insert('payment_intents', {
     order_id: order.id,
-    provider: 'sandbox',
+    provider: real ? 'mercadopago' : 'sandbox',
     provider_reference: crypto.randomUUID(),
     amount: order.total,
     status: 'PENDING',
     expires_at: new Date(Date.now() + 10 * 60_000),
   });
   await s.audit('payment.intent_created', intent.id);
-  return { ...intent, sandbox: true };
+  return real ? createMercadoCheckout(s, intent) : { ...intent, sandbox: true };
 }
 export interface GatewayEvent {
+  provider?: 'sandbox' | 'mercadopago';
+  payment_reference?: string;
+  review_reason?: string;
   event_id: string;
   reference: string;
   amount: string;
@@ -93,7 +108,11 @@ export interface GatewayEvent {
   settled: boolean;
 }
 export async function capturePayment(s: Scope, input: GatewayEvent) {
-  const intents = await s.list('payment_intents', sql`provider_reference=${input.reference}`);
+  const provider = input.provider ?? 'sandbox';
+  const intents = await s.list(
+    'payment_intents',
+    sql`provider_reference=${input.reference} AND provider=${provider}`,
+  );
   ensure(intents.length, 'NOT_FOUND', 'Intenção de pagamento não encontrada.', 404);
   const intent = intents[0];
   ensure(
@@ -101,7 +120,20 @@ export async function capturePayment(s: Scope, input: GatewayEvent) {
     'CONFLICT',
     'Valor do provedor diverge da intenção.',
   );
-  const previous = await s.list('payments', sql`intent_id=${intent.id}`);
+  const handled = await s.list(
+    'payment_webhooks',
+    sql`provider=${provider} AND provider_event_id=${input.event_id}`,
+  );
+  if (handled[0]?.payment_id) {
+    const payment = await s.get('payments', handled[0].payment_id);
+    ensure(payment.intent_id === intent.id, 'CONFLICT', 'Evento pertence a outro pagamento.', 409);
+    return { payment, duplicate: true };
+  }
+  const prior = await s.list('payments', sql`intent_id=${intent.id}`);
+  const previous =
+    provider === 'mercadopago'
+      ? prior.filter((payment) => payment.provider_reference === input.payment_reference)
+      : prior;
   if (previous.length) {
     ensure(
       previous[0].status !== 'FAILED' || input.status === 'FAILED',
@@ -109,7 +141,7 @@ export async function capturePayment(s: Scope, input: GatewayEvent) {
       'Pagamento exige conciliação com referência nova.',
     );
     await s.insert('payment_webhooks', {
-      provider: 'sandbox',
+      provider,
       provider_event_id: input.event_id,
       payload_hash: (await import('../../../packages/shared/src/index.js')).hash(
         JSON.stringify(input),
@@ -121,8 +153,8 @@ export async function capturePayment(s: Scope, input: GatewayEvent) {
   }
   const payment = await s.insert('payments', {
     intent_id: intent.id,
-    provider: 'sandbox',
-    provider_reference: intent.provider_reference,
+    provider,
+    provider_reference: input.payment_reference ?? intent.provider_reference,
     amount: intent.amount,
     status: input.status,
     confirmed_at: input.status === 'APPROVED' ? new Date() : null,
@@ -131,7 +163,7 @@ export async function capturePayment(s: Scope, input: GatewayEvent) {
   });
   await s.update('payment_intents', intent.id, { status: input.status });
   await s.insert('payment_webhooks', {
-    provider: 'sandbox',
+    provider,
     provider_event_id: input.event_id,
     payload_hash: (await import('../../../packages/shared/src/index.js')).hash(
       JSON.stringify(input),
@@ -144,6 +176,16 @@ export async function capturePayment(s: Scope, input: GatewayEvent) {
   if (input.status === 'APPROVED') {
     await s.tx.execute(sql`SAVEPOINT confirm_paid_order`);
     try {
+      ensure(
+        !input.review_reason &&
+          !prior.some((payment) =>
+            ['APPROVED', 'PARTIALLY_REFUNDED', 'REFUNDED'].includes(payment.status),
+          ),
+        'CONFLICT',
+        input.review_reason ||
+          'Pagamento adicional para a mesma intenção. Revise e estorne o valor excedente.',
+        409,
+      );
       ensure(
         new Date(`${intent.expires_at}Z`).getTime() > Date.now(),
         'CONFLICT',
@@ -291,13 +333,17 @@ export async function refundPayment(
       'Caixa encerrado.',
     );
   }
+  const providerReference =
+    payment.provider === 'mercadopago'
+      ? await refundMercado(s, payment, input.amount, alreadyRefunded)
+      : crypto.randomUUID();
   const refund = await s.insert('refunds', {
     payment_id: paymentId,
     tab_id: input.tab_id ?? null,
     amount: input.amount,
     reason: input.reason,
     created_by: s.actor.id,
-    provider_reference: crypto.randomUUID(),
+    provider_reference: providerReference,
     status: 'APPROVED',
   });
   await s.update('payments', paymentId, {
@@ -319,4 +365,114 @@ export async function refundPayment(
   });
   await s.event('payment.refunded', paymentId);
   return refund;
+}
+
+/** Only called with a payment fetched from Mercado Pago with this venue's seller token. */
+export async function reconcileMercadoPayment(s: Scope, remote: Row) {
+  const intent = (
+    await s.list(
+      'payment_intents',
+      sql`provider='mercadopago' AND provider_reference=${String(remote.external_reference ?? '')}`,
+    )
+  )[0];
+  if (!intent) return { ignored: true };
+  ensure(
+    remote.currency_id === 'BRL' &&
+      String(remote.collector_id) === intent.external_account_id &&
+      /^\d+$/.test(String(remote.id)),
+    'CONFLICT',
+    'Moeda ou conta recebedora divergente.',
+    409,
+  );
+  ensure(
+    money(String(remote.transaction_amount)) === money(intent.amount),
+    'CONFLICT',
+    'Valor recebido diverge do pedido.',
+    409,
+  );
+  if (!['approved', 'refunded', 'charged_back'].includes(remote.status)) return { pending: true };
+  const event_id =
+    'mp:' +
+    remote.id +
+    ':' +
+    (await import('../../../packages/shared/src/index.js'))
+      .hash(JSON.stringify([remote.status, remote.date_last_updated, remote.refunds ?? []]))
+      .slice(0, 48);
+  const captured = await capturePayment(s, {
+    provider: 'mercadopago',
+    payment_reference: String(remote.id),
+    event_id,
+    reference: intent.provider_reference,
+    amount: intent.amount,
+    status: 'APPROVED',
+    settled: false,
+    ...(Number(remote.transaction_amount_refunded ?? 0) > 0 ||
+    remote.status === 'charged_back' ||
+    remote.status === 'refunded'
+      ? {
+          review_reason:
+            'Pagamento com estorno ou contestação no Mercado Pago. Confira antes de liberar o pedido.',
+        }
+      : {}),
+  });
+  const payment = await s.get('payments', captured.payment.id);
+  const allocations = await s.list('payment_allocations', sql`payment_id=${payment.id}`);
+  const known = await s.list('refunds', sql`payment_id=${payment.id} AND status='APPROVED'`);
+  let refunded = known.reduce((total, refund) => total + money(refund.amount), 0n);
+  let added = false;
+  for (const refund of Array.isArray(remote.refunds) ? remote.refunds : []) {
+    if (refund.status && refund.status !== 'approved') continue;
+    const reference = String(refund.id);
+    ensure(/^\d+$/.test(reference), 'CONFLICT', 'Referência de estorno inválida.', 409);
+    if (known.some((item) => item.provider_reference === reference)) continue;
+    const amount = money(String(refund.amount));
+    ensure(
+      amount > 0n && refunded + amount <= money(payment.amount),
+      'CONFLICT',
+      'Estorno externo divergente do pagamento.',
+      409,
+    );
+    await s.insert('refunds', {
+      payment_id: payment.id,
+      tab_id: allocations.length === 1 ? allocations[0].tab_id : null,
+      amount: formatDecimal(amount),
+      reason: 'Estorno registrado no Mercado Pago',
+      created_by: s.actor.id,
+      provider_reference: reference,
+      status: 'APPROVED',
+    });
+    refunded += amount;
+    added = true;
+  }
+  if (added) {
+    await s.update('payments', payment.id, {
+      status: refunded === money(payment.amount) ? 'REFUNDED' : 'PARTIALLY_REFUNDED',
+      review_reason: 'Estorno externo recebido. Confira o consumo e o atendimento.',
+    });
+    await s.audit('payment.external_refund', payment.id, { amount: formatDecimal(refunded) });
+    await s.event('payment.refunded', payment.id);
+  }
+  if (remote.status === 'charged_back') {
+    const remaining = money(payment.amount) - refunded;
+    if (remaining > 0n) {
+      await s.insert('refunds', {
+        payment_id: payment.id,
+        tab_id: allocations.length === 1 ? allocations[0].tab_id : null,
+        amount: formatDecimal(remaining),
+        reason: 'Contestação confirmada no Mercado Pago',
+        created_by: s.actor.id,
+        provider_reference: 'chargeback:' + remote.id,
+        status: 'APPROVED',
+      });
+      await s.event('payment.refunded', payment.id);
+    }
+    await s.update('payments', payment.id, {
+      status: 'REFUNDED',
+      review_reason: 'Pagamento contestado no Mercado Pago. Conciliação administrativa necessária.',
+    });
+  }
+  return {
+    payment: await s.get('payments', payment.id),
+    requires_review: captured.requires_review ?? payment.review_reason ?? null,
+  };
 }

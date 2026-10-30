@@ -1,6 +1,10 @@
 import { spawn } from 'node:child_process';
 import { buildApp } from '../../apps/api/src/app.js';
 import { pool } from '../../packages/database/src/index.js';
+if (process.env.MESA_TEST_COMPLEMENTS === '1') {
+  const { fakeComplementProviders } = await import('../complement-transport.js');
+  globalThis.fetch = fakeComplementProviders(true).transport;
+}
 const worker = spawn(process.execPath, ['--import', 'tsx', 'apps/worker/src/index.ts'], {
   stdio: 'inherit',
   // Browser scenarios use synthetic push endpoints; real transport retries are covered in integration tests.

@@ -1,3 +1,4 @@
+import { TcpAgentSettings } from './tcp-agent-settings.js';
 import { useToasts } from './toasts.js';
 import { printDocumentLabel } from '../../shared/src/table-qr-print.js';
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
@@ -367,7 +368,12 @@ export function PrintBridgePanel({
           </div>
         </>
       )}
-      {!independent && <PrintStationsPanel />}
+      {!independent && (
+        <>
+          <PrintStationsPanel />
+          <TcpAgentSettings printers={printers} />
+        </>
+      )}
       {station.activities.length > 0 && (
         <div className="printbridge-activity">
           <h3>Atividade desta estação</h3>

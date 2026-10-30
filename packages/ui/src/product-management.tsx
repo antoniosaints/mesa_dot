@@ -1,6 +1,10 @@
 import { recordColorField, RecordTag } from './record-tags.js';
 import { ProductInitialStockModal } from './product-initial-stock.js';
-import { TableLoading } from './pagination.js';
+import { Pagination, TableLoading, useClientPagination } from './pagination.js';
+import { ProductHelp, ProductToggle } from './product-ui.js';
+import { ProductPhotoEditor } from './product-photo.js';
+import { AiDraftActions } from './ai-draft-action.js';
+import { measurementUnits, measurementUnit } from '../../shared/src/measurement-units.js';
 import { useEffect, useId, useState, useRef } from 'react';
 import { flushSync } from 'react-dom';
 import { api, brl, session, type Data } from './client.js';
@@ -28,6 +32,15 @@ const policies = {
   ON_PRODUCTION: 'Na produção',
   RECIPE: 'Ficha técnica',
 };
+const policyDescriptions: Record<string, string> = {
+  NO_CONTROL: 'Permite vender sem verificar ou baixar um saldo de estoque.',
+  ON_CONFIRMATION: 'Reserva o saldo e registra a baixa quando o pedido é confirmado.',
+  ON_DELIVERY: 'Reserva o saldo ao confirmar o pedido e registra a baixa na entrega da ficha.',
+  ON_PRODUCTION:
+    'Reserva o saldo ao confirmar o pedido e registra a baixa quando o preparo fica pronto.',
+  RECIPE:
+    'Consome os ingredientes da ficha técnica, usando a origem de estoque de cada ingrediente.',
+};
 export function ProductManagementModal({
   record,
   categories = [],
@@ -49,6 +62,8 @@ export function ProductManagementModal({
     null,
   );
   const [productId, setProductId] = useState<string | null>(record.id ?? null);
+  const [photoProduct, setPhotoProduct] = useState(record);
+  const [photoPreparing, setPhotoPreparing] = useState(false);
   const [context, setContext] = useState<Data | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -57,10 +72,29 @@ export function ProductManagementModal({
   const [movementBalance, setMovementBalance] = useState('');
   const [categoriesOpen, setCategoriesOpen] = useState(false);
   const [groupsOpen, setGroupsOpen] = useState(false);
+  const [variantSearch, setVariantSearch] = useState('');
+  const variantPage = useClientPagination<Data>(
+    (context?.variants ?? []).filter((variant: Data) =>
+      variant.name.toLocaleLowerCase('pt-BR').includes(variantSearch.toLocaleLowerCase('pt-BR')),
+    ),
+    JSON.stringify({ productId, variantSearch }),
+  );
   const allCategories = context?.categories ?? categories;
   const locations = context?.locations ?? [];
   const fields: Field[] = [
     { key: 'name', label: 'Nome', required: true, maxLength: 160 },
+    {
+      key: 'unit_code',
+      label: 'Unidade de medida',
+      type: 'select',
+      required: true,
+      initial: 'UN',
+      options: measurementUnits.map((unit) => ({
+        id: unit.code,
+        name: `${unit.name} (${unit.symbol})`,
+      })),
+      hint: 'Medida usada no estoque e na ficha técnica.',
+    },
     {
       key: 'category_id',
       label: 'Categoria',
@@ -70,6 +104,13 @@ export function ProductManagementModal({
     { key: 'description', label: 'Descrição', type: 'textarea', maxLength: 2000 },
     { key: 'enabled', label: 'Disponível', type: 'checkbox', initial: true },
     { key: 'price', label: 'Preço', type: 'currency', required: true },
+    {
+      key: 'default_variant_name',
+      label: 'Nome da variação padrão',
+      required: true,
+      initial: 'Padrão',
+      maxLength: 100,
+    },
     {
       key: 'stock_policy',
       label: 'Baixa de estoque',
@@ -113,11 +154,13 @@ export function ProductManagementModal({
       .getElementById(`${tabsId}-${tab}`)
       ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   }, [tab, tabsId]);
-  const dirty = canCatalog && formValuesChanged(values, initial);
+  const dirty =
+    canCatalog && (formValuesChanged(values, initial) || values.photo_base64 !== undefined);
   async function reload() {
     if (!productId) return;
     const data = await api('/products/' + productId + '/management');
     setContext(data);
+    setPhotoProduct(data.product);
   }
   useEffect(() => {
     if (!productId) return;
@@ -128,6 +171,7 @@ export function ProductManagementModal({
       .then((data) => {
         if (active) {
           setContext(data);
+          setPhotoProduct(data.product);
           if (!initialized.current && canCatalog) {
             const start = initialFor(data.product);
             setInitial(start);
@@ -149,21 +193,21 @@ export function ProductManagementModal({
   const tabs = [
     ...(canCatalog
       ? [
-          { id: 'general', name: 'Geral' },
-          { id: 'prices', name: 'Preços e variações' },
-          { id: 'policy', name: 'Estoque e produção' },
+          { id: 'general', name: 'Geral', icon: 'menu' as const },
+          { id: 'prices', name: 'Preços e variações', icon: 'payments' as const },
+          { id: 'policy', name: 'Estoque e produção', icon: 'settings' as const },
         ]
       : []),
     ...(canStock
       ? [
-          { id: 'balances', name: 'Estoques e locais' },
-          { id: 'movements', name: 'Movimentações' },
+          { id: 'balances', name: 'Estoques e locais', icon: 'inventory' as const },
+          { id: 'movements', name: 'Movimentações', icon: 'clock' as const },
         ]
       : []),
     ...(canCatalog
       ? [
-          { id: 'recipe', name: 'Ficha técnica' },
-          { id: 'addons', name: 'Adicionais' },
+          { id: 'recipe', name: 'Ficha técnica', icon: 'receipt' as const },
+          { id: 'addons', name: 'Adicionais', icon: 'plus' as const },
         ]
       : []),
   ];
@@ -221,13 +265,29 @@ export function ProductManagementModal({
       },
     });
   }
+  function removeVariant(variant: Data) {
+    forms.open({
+      title: 'Remover variação',
+      description: `Remover “${variant.name}” das novas vendas? Pedidos e movimentações anteriores serão preservados. A variação padrão continuará disponível.`,
+      fields: [],
+      submitLabel: 'Remover variação',
+      submitVariant: 'danger',
+      successMessage: 'Variação removida.',
+      onSubmit: async () => {
+        await api('/product-variants/' + variant.id, undefined, 'DELETE');
+        await reload();
+      },
+    });
+  }
   const needsSaved = !productId && ['balances', 'movements', 'recipe', 'addons'].includes(tab);
   return (
     <Modal
       title={productId ? 'Editar · Produtos' : 'Adicionar · Produtos'}
       heading={
         <span>
-          <Icon name="menu" size={23} />
+          <span className="product-heading-symbol">
+            <Icon name="menu" size={23} />
+          </span>
           <span>
             {values.name || record.name || 'Novo produto'}
             <small>Gestão do produto · cadastro, variações e estoques</small>
@@ -236,19 +296,13 @@ export function ProductManagementModal({
       }
       className="product-management-modal"
       dirty={dirty}
-      closeDisabled={busy}
+      closeDisabled={busy || photoPreparing}
       onClose={() => {
         onClose();
         void onChange();
       }}
     >
       <div className="product-management-top">
-        {productId && (
-          <button type="button" disabled={busy} onClick={() => void run(reload)}>
-            <Icon name="refresh" size={15} />
-            Atualizar dados
-          </button>
-        )}
         <span className={'badge ' + (values.enabled ? 'available' : 'cancelled')}>
           {values.enabled ? 'Ativo' : 'Inativo'}
         </span>
@@ -258,12 +312,58 @@ export function ProductManagementModal({
         <span>{productId ? 'Cód. ' + productId.slice(0, 8).toUpperCase() : 'Novo cadastro'}</span>
         {context && (
           <span>
-            {context.variants.length} variação(ões) · {context.balances.length} estoque(s)
+            {1 + context.variants.length} variação(ões) · {context.balances.length} estoque(s)
           </span>
         )}
         {dirty && <span className="product-unsaved">Alterações não salvas</span>}
+        {productId && (
+          <button type="button" disabled={busy || loading} onClick={() => void run(reload)}>
+            <Icon name="refresh" size={15} />
+            Atualizar dados
+          </button>
+        )}
       </div>
-      <div className="product-management-tabs" role="tablist" aria-label="Dados do produto">
+      <div className="product-overview" aria-label="Resumo do produto">
+        {canCatalog && (
+          <div>
+            <Icon name="payments" size={18} />
+            <span>
+              Preço padrão<strong>{values.price ? brl(values.price) : 'A definir'}</strong>
+            </span>
+          </div>
+        )}
+        <div>
+          <Icon name="inventory" size={18} />
+          <span>
+            Controle de estoque
+            <strong>
+              {policies[
+                (canCatalog
+                  ? values.stock_policy
+                  : context?.product.stock_policy) as keyof typeof policies
+              ] ?? 'Carregando…'}
+            </strong>
+          </span>
+        </div>
+        {canCatalog && (
+          <div>
+            <Icon name="production" size={18} />
+            <span>
+              Preparo
+              <strong>
+                {values.requires_production || values.stock_policy === 'ON_PRODUCTION'
+                  ? 'Produção · ' + values.sector
+                  : 'Entrega sem preparo'}
+              </strong>
+            </span>
+          </div>
+        )}
+      </div>
+      <div
+        className="product-management-tabs system-tabs"
+        role="tablist"
+        aria-label="Dados do produto"
+      >
         {tabs.map((t, index) => (
           <button
             key={t.id}
@@ -286,6 +386,7 @@ export function ProductManagementModal({
               document.getElementById(`${tabsId}-${tabs[next].id}`)?.focus();
             }}
           >
+            <Icon name={t.icon} size={16} />
             {t.name}
           </button>
         ))}
@@ -318,7 +419,9 @@ export function ProductManagementModal({
           const keep =
             (event.nativeEvent as SubmitEvent).submitter?.getAttribute('data-continue') === 'true';
           void run(async () => {
+            if (photoPreparing) throw new Error('Aguarde a preparação da foto.');
             const data = serializeFormValues(fields, values);
+            if (values.photo_base64 !== undefined) data.photo_base64 = values.photo_base64;
             data.category_id = values.category_id || null;
             data.stock_location_id = values.stock_location_id || null;
             const saved = await api(
@@ -327,7 +430,11 @@ export function ProductManagementModal({
               productId ? 'PATCH' : 'POST',
             );
             const created = !productId;
-            setInitial(values);
+            const clean = { ...values };
+            delete clean.photo_base64;
+            setInitial(clean);
+            setValues(clean);
+            setPhotoProduct(saved);
             setProductId(saved.id);
             if (created && canAdjust) {
               setStockPrompt({ product: saved, closeAfter: !keep });
@@ -338,7 +445,7 @@ export function ProductManagementModal({
         }}
       >
         <fieldset
-          disabled={busy || (loading && !initialized.current)}
+          disabled={busy || photoPreparing || (loading && !initialized.current)}
           className="product-management-content"
         >
           {canCatalog && (
@@ -359,14 +466,88 @@ export function ProductManagementModal({
                   Categorias
                 </button>
               </div>
-              <div className="product-main-fields">
-                <FormFields
-                  fields={fields.filter((f) =>
-                    ['name', 'category_id', 'description', 'enabled'].includes(f.key),
+              <div className="product-general-layout">
+                <div className="product-editor-card">
+                  <div className="product-main-fields">
+                    <ProductPhotoEditor
+                      product={{ ...photoProduct, name: values.name || 'Novo produto' }}
+                      value={values.photo_base64}
+                      onChange={(photo_base64) =>
+                        setValues((current) => ({ ...current, photo_base64 }))
+                      }
+                      onPreparingChange={setPhotoPreparing}
+                    />
+                    <FormFields
+                      fields={fields.filter((f) =>
+                        ['name', 'category_id', 'description'].includes(f.key),
+                      )}
+                      values={values}
+                      onChange={setValues}
+                    />
+                    <AiDraftActions
+                      context={{
+                        kind: 'product',
+                        name: values.name,
+                        description: values.description,
+                        category: allCategories.find((c: Data) => c.id === values.category_id)
+                          ?.name,
+                      }}
+                      onApply={(description) =>
+                        setValues((current) => ({ ...current, description }))
+                      }
+                      images
+                    />
+                  </div>
+                  <div className="product-measure-settings">
+                    <FormFields
+                      fields={fields.filter((field) => field.key === 'unit_code')}
+                      values={values}
+                      onChange={setValues}
+                    />
+                    <ProductToggle
+                      label="Disponível"
+                      description="Exibe o produto no cardápio. A disponibilidade para pedir também respeita o estoque e as regras do estabelecimento."
+                      checked={Boolean(values.enabled)}
+                      onChange={(enabled) => setValues({ ...values, enabled })}
+                    />
+                  </div>
+                  {productId && values.unit_code !== initial.unit_code && (
+                    <ProductHelp>
+                      Alterar a unidade não converte saldos, reservas ou receitas automaticamente.
+                      Confira as quantidades antes de salvar. Movimentações e reposições já
+                      registradas mantêm a unidade original.
+                    </ProductHelp>
                   )}
-                  values={values}
-                  onChange={setValues}
-                />
+                </div>
+                <aside className="product-context-card">
+                  <h4>
+                    <Icon name="eye" size={17} />
+                    No cardápio
+                  </h4>
+                  <strong className="product-context-name">
+                    {values.name || 'Nome do produto'}
+                  </strong>
+                  <RecordTag
+                    color={allCategories.find((c: Data) => c.id === values.category_id)?.color}
+                  >
+                    {allCategories.find((c: Data) => c.id === values.category_id)?.name ??
+                      'Sem categoria'}
+                  </RecordTag>
+                  <p>
+                    {values.description ||
+                      'Adicione uma descrição para ajudar o cliente a escolher.'}
+                  </p>
+                  <b>{values.price ? brl(values.price) : 'Defina o preço na próxima aba'}</b>
+                  <small>
+                    Medida: {measurementUnit(values.unit_code).name} (
+                    {measurementUnit(values.unit_code).symbol})
+                  </small>
+                  <small>Prévia dos dados preenchidos, antes de salvar.</small>
+                  <button type="button" onClick={() => setTab('prices')}>
+                    <Icon name="next" size={15} />
+                    Configurar preços
+                  </button>
+                </aside>
               </div>
             </section>
           )}
@@ -379,40 +560,71 @@ export function ProductManagementModal({
               data-product-panel="prices"
             >
               <div className="product-config-section">
-                <h3>Preço padrão</h3>
-                <div className="product-base-price">
-                  <FormFields
-                    fields={fields.filter((f) => f.key === 'price')}
-                    values={values}
-                    onChange={setValues}
-                  />
+                <div className="product-price-card">
+                  <div>
+                    <h3>
+                      Variação padrão <span className="badge available">Obrigatória</span>
+                    </h3>
+                    <p>
+                      Personalize o nome e o preço desta opção. Ela usa o estoque base do produto e
+                      garante ao menos uma variação.
+                    </p>
+                  </div>
+                  <div className="product-base-price">
+                    <FormFields
+                      fields={['default_variant_name', 'price'].map((key) =>
+                        fields.find((field) => field.key === key)!,
+                      )}
+                      values={values}
+                      onChange={setValues}
+                    />
+                  </div>
                 </div>
                 <div className="section-head">
                   <div>
-                    <h3>Variações ({context?.variants.length ?? 0})</h3>
+                    <h3>Variações ({1 + (context?.variants.length ?? 0)})</h3>
                     <p className="muted small">
-                      Nome, preço, disponibilidade e modo de estoque de cada opção.
+                      Inclui a padrão obrigatória. As adicionais têm nome, preço e estoque próprios
+                      e são salvas em seus formulários.
                     </p>
                   </div>
                   {productId && (
-                    <button type="button" onClick={() => editVariant()}>
+                    <button type="button" className="primary" onClick={() => editVariant()}>
                       <Icon name="plus" size={16} />
                       Nova variação
                     </button>
                   )}
                 </div>
+                {productId && Boolean(context?.variants.length) && (
+                  <label className="product-inline-search">
+                    <Icon name="search" size={16} />
+                    <input
+                      type="search"
+                      aria-label="Buscar variação"
+                      placeholder="Buscar variação pelo nome…"
+                      value={variantSearch}
+                      onChange={(event) => setVariantSearch(event.target.value)}
+                    />
+                  </label>
+                )}
                 {!productId ? (
                   <p className="product-management-note">
-                    Salve e continue para adicionar variações a este produto.
+                    A variação padrão será salva com o produto. Salve e continue para adicionar
+                    outras opções.
                   </p>
                 ) : context?.variants.length ? (
                   <div className="product-config-list">
-                    {context.variants.map((v: Data) => (
+                    {variantPage.rows.length === 0 && (
+                      <Empty>Nenhuma variação corresponde à busca.</Empty>
+                    )}
+                    {variantPage.rows.map((v: Data) => (
                       <article key={v.id}>
                         <div>
                           <strong>{v.name}</strong>
+                          <span className={'badge ' + (v.enabled ? 'available' : 'cancelled')}>
+                            {v.enabled ? 'Ativa' : 'Inativa'}
+                          </span>
                           <small>
-                            {v.enabled ? 'Ativa' : 'Inativa'} ·{' '}
                             {v.stock_mode === 'OWN' ? 'Saldo próprio' : 'Estoque compartilhado'}
                             {v.stock_mode === 'OWN'
                               ? ' · ' +
@@ -422,18 +634,44 @@ export function ProductManagementModal({
                           </small>
                         </div>
                         <b>{brl(v.price)}</b>
-                        <button
-                          type="button"
-                          aria-label={'Editar variação ' + v.name}
-                          onClick={() => editVariant(v)}
-                        >
-                          <Icon name="edit" size={16} />
-                        </button>
+                        <div className="button-row product-variant-actions">
+                          <button
+                            type="button"
+                            aria-label={'Editar variação ' + v.name}
+                            onClick={() => editVariant(v)}
+                          >
+                            <Icon name="edit" size={16} />
+                            Editar
+                          </button>
+                          <button
+                            type="button"
+                            className="danger"
+                            aria-label={'Remover variação ' + v.name}
+                            onClick={() => removeVariant(v)}
+                            disabled={busy || loading}
+                          >
+                            <Icon name="trash" size={16} />
+                            Remover
+                          </button>
+                        </div>
                       </article>
                     ))}
                   </div>
                 ) : (
-                  <Empty>Nenhuma variação. O preço padrão será usado.</Empty>
+                  <Empty>
+                    Este produto possui a variação padrão acima. Para acrescentar outro tamanho ou
+                    volume, clique em Nova variação.
+                  </Empty>
+                )}
+                {Boolean(context?.variants.length) && (
+                  <Pagination
+                    label="Variações adicionais do produto"
+                    total={variantPage.total}
+                    page={variantPage.page}
+                    pageSize={variantPage.pageSize}
+                    onPageChange={variantPage.onPageChange}
+                    onPageSizeChange={variantPage.onPageSizeChange}
+                  />
                 )}
               </div>
             </section>
@@ -448,23 +686,70 @@ export function ProductManagementModal({
             >
               <div className="product-config-section">
                 <h3>Regras de baixa e produção</h3>
-                <p className="product-management-note">
+                <ProductHelp>
                   Essas regras valem para novos pedidos. Reservas de pedidos já lançados continuam
                   vinculadas ao estoque original.
-                </p>
-                <div className="product-main-fields">
-                  <FormFields
-                    fields={fields.filter((f) =>
-                      [
-                        'stock_policy',
-                        'requires_production',
-                        'sector',
-                        ...(canStock ? ['stock_location_id'] : []),
-                      ].includes(f.key),
+                </ProductHelp>
+                <div className="product-policy-layout">
+                  <div className="product-editor-card">
+                    <h4>
+                      <Icon name="inventory" size={17} />
+                      Controle de estoque
+                    </h4>
+                    <div className="product-main-fields">
+                      <FormFields
+                        fields={fields.filter((f) =>
+                          ['stock_policy', ...(canStock ? ['stock_location_id'] : [])].includes(
+                            f.key,
+                          ),
+                        )}
+                        values={values}
+                        onChange={setValues}
+                      />
+                    </div>
+                    <ProductHelp>{policyDescriptions[values.stock_policy]}</ProductHelp>
+                    {canStock && (
+                      <button type="button" onClick={() => setTab('balances')}>
+                        <Icon name="inventory" size={15} />
+                        Ver estoques e locais
+                      </button>
                     )}
-                    values={values}
-                    onChange={setValues}
-                  />
+                    {values.stock_policy === 'RECIPE' && (
+                      <button type="button" onClick={() => setTab('recipe')}>
+                        <Icon name="receipt" size={15} />
+                        Configurar ficha técnica
+                      </button>
+                    )}
+                  </div>
+                  <div className="product-editor-card">
+                    <h4>
+                      <Icon name="production" size={17} />
+                      Preparo e destino
+                    </h4>
+                    <ProductToggle
+                      label="Exige produção"
+                      description="Encaminha as fichas para a fila de preparo antes da entrega."
+                      checked={Boolean(values.requires_production)}
+                      onChange={(requires_production) =>
+                        setValues({ ...values, requires_production })
+                      }
+                    />
+                    <FormFields
+                      fields={fields.filter((f) => f.key === 'sector')}
+                      values={values}
+                      onChange={setValues}
+                    />
+                    <p className="field-hint">
+                      Identifica o setor responsável pelas fichas, como bar ou cozinha. Mantenha o
+                      nome usado pela sua operação.
+                    </p>
+                    {values.stock_policy === 'ON_PRODUCTION' && (
+                      <ProductHelp>
+                        A baixa Na produção exige preparo, mesmo com a opção Exige produção
+                        desligada.
+                      </ProductHelp>
+                    )}
+                  </div>
                 </div>
               </div>
             </section>
@@ -535,13 +820,11 @@ export function ProductManagementModal({
                 id={`${tabsId}-panel-addons`}
                 aria-labelledby={`${tabsId}-addons`}
               >
-                <div className="product-shared-actions">
-                  <button type="button" onClick={() => setGroupsOpen(true)}>
-                    <Icon name="folder" size={16} />
-                    Gerenciar grupos e adicionais
-                  </button>
-                </div>
-                <ProductAddons context={context} refresh={reload} />
+                <ProductAddons
+                  context={context}
+                  refresh={reload}
+                  onManageGroups={() => setGroupsOpen(true)}
+                />
               </section>
             )}
           </>
@@ -550,16 +833,26 @@ export function ProductManagementModal({
       <div className="modal-footer product-management-footer">
         <span className="muted small">
           {dirty
-            ? 'Cadastro com alterações pendentes'
-            : 'Estoque, variações e vínculos são salvos em suas próprias operações.'}
+            ? 'Dados, foto, preço padrão e regras aguardam Salvar. Demais ações são gravadas na própria operação.'
+            : 'Cadastro pronto. Variações, estoques, ficha e adicionais são gravados em cada operação.'}
         </span>
-        <ModalCloseButton disabled={busy} />
+        <ModalCloseButton disabled={busy || photoPreparing} />
         {canCatalog && (
           <>
-            <button type="submit" form={formId} data-continue="true" disabled={busy}>
+            <button
+              type="submit"
+              form={formId}
+              data-continue="true"
+              disabled={busy || photoPreparing}
+            >
               Salvar e continuar
             </button>
-            <button type="submit" form={formId} className="primary" disabled={busy}>
+            <button
+              type="submit"
+              form={formId}
+              className="primary"
+              disabled={busy || photoPreparing}
+            >
               <Icon name="check" size={16} />
               {busy ? 'Salvando…' : 'Salvar'}
             </button>

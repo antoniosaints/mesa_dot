@@ -69,6 +69,7 @@ export async function changeStock(
   });
   await s.insert('stock_movements', {
     balance_id: balance.id,
+    unit_code: (await s.get('products', balance.product_id)).unit_code,
     ticket_id: ticketId,
     quantity: formatDecimal(physicalDelta || reservedDelta, 3),
     type,

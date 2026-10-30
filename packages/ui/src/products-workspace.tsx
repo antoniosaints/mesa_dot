@@ -1,3 +1,4 @@
+import { unitSymbol } from '../../shared/src/measurement-units.js';
 import { recordColorField, RecordTag, ColorDot } from './record-tags.js';
 import { Pagination, TableLoading, paginate } from './pagination.js';
 import { useState } from 'react';
@@ -7,6 +8,7 @@ import { Empty, useAction } from './common.js';
 import { SearchSelect } from './controls.js';
 import { useFormDialog } from './forms.js';
 import { ProductManagementModal } from './product-management.js';
+import { ProductPhotoImage, ProductPhotoPreview } from './product-photo.js';
 import { normalizeOrderSearch } from './orders-view.js';
 
 const stockLabels: Record<string, string> = {
@@ -40,6 +42,7 @@ export function ProductsWorkspace({
   const [page, setPage] = useState(1);
   const [size, setSize] = useState(10);
   const [editing, setEditing] = useState<Data | null>(null);
+  const [photo, setPhoto] = useState<Data | null>(null);
   const [reloading, setReloading] = useState(false);
   const { run, busy } = useAction();
   const forms = useFormDialog();
@@ -296,23 +299,34 @@ export function ProductsWorkspace({
                     return (
                       <tr key={p.id} className={editing?.id === p.id ? 'selected' : ''}>
                         <td>
-                          <button
-                            className="catalog-product-link"
-                            onClick={() => {
-                              if (editing?.id !== p.id) edit(p);
-                            }}
-                          >
-                            <span className="catalog-thumbnail">
-                              <Icon
-                                name={p.requires_production ? 'production' : 'menu'}
-                                size={23}
-                              />
-                            </span>
-                            <span>
-                              <strong>{p.name}</strong>
-                              <small>Cód. {p.id.slice(0, 8).toUpperCase()}</small>
-                            </span>
-                          </button>
+                          <div className="catalog-product-identity">
+                            {p.photo_revision ? (
+                              <button
+                                type="button"
+                                className="catalog-thumbnail catalog-photo-button"
+                                aria-label={'Ver foto de ' + p.name}
+                                title="Ampliar foto"
+                                onClick={() => setPhoto(p)}
+                              >
+                                <ProductPhotoImage product={p} decorative />
+                              </button>
+                            ) : (
+                              <span className="catalog-thumbnail">
+                                <ProductPhotoImage product={p} decorative />
+                              </span>
+                            )}
+                            <button
+                              className="catalog-product-link"
+                              onClick={() => {
+                                if (editing?.id !== p.id) edit(p);
+                              }}
+                            >
+                              <span>
+                                <strong>{p.name}</strong>
+                                <small>Cód. {p.id.slice(0, 8).toUpperCase()}</small>
+                              </span>
+                            </button>
+                          </div>
                         </td>
                         <td className="catalog-product-price">{brl(p.price)}</td>
                         <td>
@@ -325,7 +339,8 @@ export function ProductsWorkspace({
                             {controlled
                               ? canViewInventory
                                 ? quantity.toLocaleString('pt-BR', { maximumFractionDigits: 3 }) +
-                                  ' un'
+                                  ' ' +
+                                  unitSymbol(p.unit_code)
                                 : 'Controlado'
                               : p.stock_policy === 'RECIPE'
                                 ? 'Ver receita'
@@ -414,6 +429,7 @@ export function ProductsWorkspace({
           onChange={onChange}
         />
       )}
+      {photo && <ProductPhotoPreview product={photo} onClose={() => setPhoto(null)} />}
       {forms.dialog}
     </section>
   );

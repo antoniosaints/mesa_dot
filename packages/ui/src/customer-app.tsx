@@ -1,3 +1,6 @@
+import { BusinessInformation } from './business-information.js';
+import { ProductPhotoImage } from './product-photo.js';
+import { OnlinePaymentDialog } from './online-payment.js';
 import { CustomerConsumption } from './customer-consumption.js';
 import { NumericInput } from './numeric-input.js';
 import { normalizeOrderSearch } from './orders-view.js';
@@ -71,6 +74,7 @@ export function CustomerApp() {
   const [tabs, setTabs] = useState<Data[]>([]);
   const [orders, setOrders] = useState<Data[]>([]);
   const [intent, setIntent] = useState<Data | null>(null);
+  const [paymentCompleted, setPaymentCompleted] = useState(false);
   const [chosenTab, setChosenTab] = useState('');
   const [activeTicket, setActiveTicket] = useState<Data | null>(null);
   const { run, refresh, busy, feedback } = useAction();
@@ -104,6 +108,7 @@ export function CustomerApp() {
     setOrders([]);
     setChosenTab('');
     setIntent(null);
+    setPaymentCompleted(false);
     setCartOpen(false);
   }, [scopeKey]);
   function selectContext(code = '') {
@@ -232,6 +237,52 @@ export function CustomerApp() {
     });
   }
   useRefresh(load, [scopeKey, visitor?.visitor_id]);
+  useEffect(() => {
+    if (!paymentCompleted) return;
+    // Navigate after the payment modal unmounts and releases its in-flight navigation guard.
+    setPaymentCompleted(false);
+    setPage('tickets');
+  }, [paymentCompleted]);
+  const paymentReturn = params.get('payment_return');
+  useEffect(() => {
+    if (!paymentReturn || !visitor?.token || !/^[a-f0-9-]{36}$/i.test(paymentReturn)) return;
+    let active = true;
+    const next = new URLSearchParams(routeLocation.search);
+    for (const key of [
+      'payment_return',
+      'payment_id',
+      'status',
+      'collection_id',
+      'collection_status',
+      'external_reference',
+      'merchant_order_id',
+      'payment_type',
+      'preference_id',
+      'processing_mode',
+      'site_id',
+    ])
+      next.delete(key);
+    void (async () => {
+      try {
+        const payment = await api('/payments/intents/' + paymentReturn);
+        if (active) setIntent(payment);
+      } catch {
+        if (active)
+          toast.error(
+            'Não foi possível consultar o pagamento. Use o mesmo navegador e atendimento em que iniciou o pedido.',
+          );
+      } finally {
+        if (active)
+          void navigate(
+            { pathname: routeLocation.pathname, search: next.toString() },
+            { replace: true },
+          );
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [paymentReturn, visitor?.visitor_id, scopeKey]);
   const searchTerm = normalizeOrderSearch(search);
   const shownProducts: Data[] = (menu?.products ?? []).filter(
     (item: Data) =>
@@ -296,7 +347,13 @@ export function CustomerApp() {
           <section className="customer-welcome">
             <div className="customer-welcome-tools">
               <span className="eyebrow">BEM-VINDO À CASA</span>
-              <InstallPwaButton />
+              <div className="customer-welcome-actions">
+                <BusinessInformation
+                  name={menu?.establishment.name ?? 'Estabelecimento'}
+                  profile={menu?.establishment.business_profile}
+                />
+                <InstallPwaButton />
+              </div>
             </div>
             <h1>{menu?.establishment.name ?? 'Preparando seu cardápio…'}</h1>
             <p>{acceptingOrders ? 'Seu próximo pedido começa aqui.' : availability.message}</p>
@@ -398,7 +455,10 @@ export function CustomerApp() {
           </div>
         </section>
         {visitor && (
-          <nav className="customer-nav customer-bottom-nav" aria-label="Navegação do cliente">
+          <nav
+            className="customer-nav customer-bottom-nav system-tabs"
+            aria-label="Navegação do cliente"
+          >
             <button
               className={page === 'menu' ? 'active' : ''}
               aria-current={page === 'menu' ? 'page' : undefined}
@@ -523,7 +583,7 @@ export function CustomerApp() {
                   }}
                 >
                   <div className={`menu-art ${p.sector === 'cozinha' ? 'food' : 'drink'}`}>
-                    <Icon name={p.sector === 'cozinha' ? 'production' : 'menu'} size={32} />
+                    <ProductPhotoImage product={p} decorative />
                   </div>
                   <div>
                     <h3>{p.name}</h3>
@@ -896,7 +956,17 @@ export function CustomerApp() {
               setProduct(null);
             }}
           >
+            {product.photo_revision && (
+              <div className="customer-product-photo">
+                <ProductPhotoImage product={product} full />
+              </div>
+            )}
             <p className="muted">{product.description}</p>
+            {product.default_variant_name &&
+              product.default_variant_name !== 'Padrão' &&
+              !menu?.variants.some((item: Data) => item.product_id === product.id) && (
+                <p className="field-hint">Variação: {product.default_variant_name}</p>
+              )}
             <strong>
               {brl(productUnitPrice)} <small className="muted">por unidade</small>
             </strong>
@@ -908,7 +978,10 @@ export function CustomerApp() {
                   options={[
                     {
                       id: String(''),
-                      name: 'Padrão · ' + String(brl(product.price)),
+                      name:
+                        (product.default_variant_name ?? 'Padrão') +
+                        ' · ' +
+                        String(brl(product.price)),
                       disabled: remainingStock(menu, cart, product.id) < 1,
                     },
                     ...(menu?.variants
@@ -1039,7 +1112,18 @@ export function CustomerApp() {
           </div>
         </Modal>
       )}
-      {intent && (
+      {intent && intent.provider === 'mercadopago' && (
+        <OnlinePaymentDialog
+          intent={intent}
+          onClose={() => setIntent(null)}
+          onApproved={async () => {
+            setIntent(null);
+            setPaymentCompleted(true);
+            await load();
+          }}
+        />
+      )}
+      {intent && intent.provider !== 'mercadopago' && (
         <Modal title="Pagamento do pedido" onClose={() => setIntent(null)}>
           <div className="stack">
             <span className="eyebrow">AMBIENTE SANDBOX</span>

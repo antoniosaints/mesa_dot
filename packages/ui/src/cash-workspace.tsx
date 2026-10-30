@@ -568,7 +568,7 @@ export function CashWorkspace() {
             })}
           </div>
           <Tabs label="Caixa">
-            <Tab id="cash-0" label="Turnos">
+            <Tab id="cash-0" label="Turnos" icon="clock">
               <div className="cash-operating-grid">
                 <section className="panel cash-active">
                   <div className="cash-section-heading">
@@ -885,7 +885,7 @@ export function CashWorkspace() {
                 />
               </section>
             </Tab>
-            <Tab id="cash-2" label="Movimentações" count={data.movements.length}>
+            <Tab id="cash-2" label="Movimentações" icon="cash" count={data.movements.length}>
               <section className="panel">
                 <div className="cash-section-heading">
                   <div>
@@ -902,7 +902,7 @@ export function CashWorkspace() {
                 />
               </section>
             </Tab>
-            <Tab id="cash-1" label="Caixas" count={data.registers.length}>
+            <Tab id="cash-1" label="Caixas" icon="payments" count={data.registers.length}>
               <section className="panel cash-registers">
                 <div className="cash-section-heading">
                   <div>

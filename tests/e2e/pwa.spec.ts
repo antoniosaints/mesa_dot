@@ -139,6 +139,7 @@ test('configuração PWA protege edição, salva logo e cores e navega sob o con
   page,
   request,
 }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto(admin + stable(a) + 'configuracoes');
   await expect(page.getByLabel('Estabelecimento', { exact: true })).toHaveCount(0);
   await expect(page.locator('.login-company')).toContainText('Bar do João');
@@ -151,7 +152,29 @@ test('configuração PWA protege edição, salva logo e cores e navega sob o con
     customer + '/' + a.slug + '/',
   );
   await page.getByRole('button', { name: 'Personalizar aplicativo' }).click();
+  const editor = page.getByRole('dialog', { name: 'Personalizar aplicativo PWA', exact: true });
+  const original = await manifest(request, a);
+  const globalColor = await page.evaluate(() =>
+    document.documentElement.style.getPropertyValue('--blue'),
+  );
   await page.getByLabel('Nome curto do aplicativo', { exact: true }).fill('João no celular');
+  await expect(editor.locator('.pwa-install-preview')).toContainText('João no celular');
+  await page.getByRole('button', { name: 'Cor principal: Violeta', exact: true }).click();
+  await expect(page.getByLabel('Cor principal em hexadecimal')).toHaveValue('#8b5cf6');
+  expect((await manifest(request, a)).theme_color).toBe(original.theme_color);
+  expect(await page.evaluate(() => document.documentElement.style.getPropertyValue('--blue'))).toBe(
+    globalColor,
+  );
+  await page.getByLabel('Cor principal em hexadecimal').fill('#abc');
+  await page.getByLabel('Nome curto do aplicativo', { exact: true }).focus();
+  await expect(editor.getByRole('alert')).toContainText('Use o formato #RRGGBB');
+  await page.getByRole('button', { name: 'Cor principal: Violeta', exact: true }).click();
+  await page.getByLabel('Logotipo do aplicativo', { exact: true }).setInputFiles({
+    name: 'invalido.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('arquivo inválido'),
+  });
+  await expect(editor.getByRole('alert')).toContainText('Escolha PNG, JPEG ou WebP');
   await page.getByRole('button', { name: 'Cancelar', exact: true }).click();
   await expect(page.getByRole('alertdialog', { name: 'Descartar alterações?' })).toBeVisible();
   await page.getByRole('button', { name: 'Continuar editando' }).click();
@@ -163,6 +186,26 @@ test('configuração PWA protege edição, salva logo e cores e navega sob o con
     .getByLabel('Logotipo do aplicativo', { exact: true })
     .setInputFiles({ name: 'logo.png', mimeType: 'image/png', buffer: PNG.sync.write(icon) });
   await expect(page.getByAltText('Prévia do logotipo selecionado')).toBeVisible();
+  await page.screenshot({ path: '.local/screenshots/pwa-personalizar-desktop-dark.png' });
+  for (const width of [390, 320]) {
+    await page.setViewportSize({ width, height: 844 });
+    await expect(editor).toBeVisible();
+    expect(await editor.evaluate((element) => element.scrollWidth <= element.clientWidth + 1)).toBe(
+      true,
+    );
+    const heading = await editor.locator(':scope > .section-head h2').boundingBox();
+    const close = await editor.locator(':scope > .section-head > .icon-button').boundingBox();
+    expect(close!.y).toBeLessThan(heading!.y + heading!.height);
+    await editor
+      .getByRole('button', { name: 'Salvar aplicativo', exact: true })
+      .scrollIntoViewIfNeeded();
+    await expect(
+      editor.getByRole('button', { name: 'Salvar aplicativo', exact: true }),
+    ).toBeInViewport();
+    await editor.evaluate((element) => element.scrollTo({ top: 0, behavior: 'instant' }));
+    await page.screenshot({ path: `.local/screenshots/pwa-personalizar-mobile-${width}-dark.png` });
+  }
+  await page.setViewportSize({ width: 1440, height: 1000 });
   await page.getByRole('button', { name: 'Salvar aplicativo', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page.locator('.pwa-phone-preview')).toContainText('João no celular');
@@ -174,6 +217,30 @@ test('configuração PWA protege edição, salva logo e cores e navega sob o con
     expect(response.ok()).toBeTruthy();
     expect(PNG.sync.read(await response.body()).width).toBe(Number(entry.sizes.split('x')[0]));
   }
+  await page.getByRole('button', { name: 'Ativar tema claro', exact: true }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+  await page.getByRole('button', { name: 'Personalizar aplicativo', exact: true }).click();
+  await page.getByRole('button', { name: 'Usar ícone padrão', exact: true }).click();
+  await expect(editor.getByAltText('Prévia do ícone no aplicativo')).toHaveAttribute(
+    'src',
+    /default-216342-fafafa/,
+  );
+  expect((await manifest(request, a)).icons[0].src).toBe(updated.icons[0].src);
+  await expect(editor.getByAltText('Prévia do ícone no aplicativo')).toHaveJSProperty(
+    'naturalWidth',
+    192,
+  );
+  await page.screenshot({ path: '.local/screenshots/pwa-personalizar-desktop-light.png' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: '.local/screenshots/pwa-personalizar-mobile-light.png' });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.getByRole('button', { name: 'Restaurar logotipo salvo', exact: true }).click();
+  await expect(editor.getByAltText('Prévia do ícone no aplicativo')).toHaveAttribute(
+    'src',
+    updated.icons[0].src.replace(/\/(192|512)\.png$/, '/192.png'),
+  );
+  await page.getByRole('button', { name: 'Cancelar', exact: true }).click();
+  await expect(editor).toHaveCount(0);
   await page.screenshot({ path: 'docs/screenshots/pwa-configuracoes.png', fullPage: true });
   await page.getByRole('button', { name: 'Equipe', exact: true }).click();
   await expect(page).toHaveURL(new RegExp(stable(a) + 'equipe'));

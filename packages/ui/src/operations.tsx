@@ -484,7 +484,7 @@ export function OrdersWorkspace({
         ) : (
           <div className="orders-results" aria-busy={refreshing}>
             <Tabs label="Pedidos e fichas">
-              <Tab id="orders" label="Pedidos" count={filtered.orders.length}>
+              <Tab id="orders" label="Pedidos" icon="orders" count={filtered.orders.length}>
                 <div className="orders-results-meta" aria-live="polite">
                   <span>
                     {sorted.length}{' '}
@@ -560,7 +560,7 @@ export function OrdersWorkspace({
                 />
               </Tab>
               {canViewTickets && (
-                <Tab id="tickets" label="Fichas" count={filtered.tickets.length}>
+                <Tab id="tickets" label="Fichas" icon="ticket" count={filtered.tickets.length}>
                   <div className="orders-ticket-intro">
                     <Icon name="ticket" size={18} />
                     <p>Fichas organizadas por mesa, atendimento, comanda e pedido.</p>

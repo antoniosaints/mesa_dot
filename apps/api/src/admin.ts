@@ -40,6 +40,14 @@ export async function inventoryAdjustment(
   const balance = await s.get('stock_balances', input.balance_id, true);
   let delta = quantity(input.quantity);
   if (input.type === 'COUNT') delta -= quantity(balance.physical_quantity);
+  if (balance.variant_id && delta > 0n) {
+    const variant = await s.get('product_variants', balance.variant_id);
+    ensure(
+      !variant.deleted_at,
+      'INVALID_STATE',
+      'Esta variação foi removida. Utilize uma variação disponível para novas entradas de estoque.',
+    );
+  }
   if (input.type === 'PURCHASE')
     ensure(delta > 0n, 'BAD_REQUEST', 'Compra deve ser positiva.', 400);
   if (input.type === 'LOSS') ensure(delta < 0n, 'BAD_REQUEST', 'Perda deve ser negativa.', 400);

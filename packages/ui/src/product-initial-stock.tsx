@@ -1,3 +1,4 @@
+import { unitSymbol } from '../../shared/src/measurement-units.js';
 import { NumericInput } from './numeric-input.js';
 import { useEffect, useRef, useState } from 'react';
 import { api, type Data } from './client.js';
@@ -143,7 +144,8 @@ export function ProductInitialStockModal({
                 disabled={busy}
               />
               <small className="field-hint">
-                Deixe em branco para iniciar com zero. Aceita até três casas decimais.
+                Informe em {unitSymbol(product.unit_code)}. Deixe em branco para iniciar com zero.
+                Aceita até três casas decimais.
               </small>
             </label>
             {product.stock_policy !== 'RECIPE' && (

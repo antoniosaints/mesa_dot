@@ -1,4 +1,6 @@
 import { DeleteTableButton } from './delete-table.js';
+import { ComplementsWorkspace } from './complements-workspace.js';
+import { AiAssistantProvider, AiSummaryButton } from './ai-assistant.js';
 import { PushSettings } from './push-settings.js';
 import { PushDeviceButton } from './push-device.js';
 import { finishBranchTransition } from './branch-transition.js';
@@ -12,7 +14,7 @@ import { flushSync } from 'react-dom';
 import { orderLocationLabel } from '../../shared/src/order-location.js';
 import { recordColorField } from './record-tags.js';
 import { companySelectionRequested } from './common.js';
-import { PwaSettings } from './pwa-settings.js';
+import { BusinessSettings } from './business-settings.js';
 import { PrintQueue } from './print-queue.js';
 import { TeamWorkspace } from './team-workspace.js';
 import { PrintBridgeProvider, PrintBridgePanel, PrintBridgeIndicator } from './printbridge.js';
@@ -70,6 +72,7 @@ const nav = [
   ['printing', 'printing', 'Impressão'],
   ['team', 'team', 'Equipe'],
   ['settings', 'settings', 'Configurações'],
+  ['complements', 'complements', 'Complementos'],
 ];
 export function AdminApp() {
   useStorageKey('bar-staff');
@@ -96,7 +99,9 @@ export function AdminApp() {
     settings: 'settings.update',
   };
   const visibleNav = nav.filter(([key]) =>
-    key === 'finance' ? Boolean(current?.actor?.isAccountAdmin) : can(pagePermissions[key]),
+    ['finance', 'complements'].includes(key)
+      ? Boolean(current?.actor?.isAccountAdmin)
+      : can(pagePermissions[key]),
   );
   useEffect(() => {
     if (!current) return;
@@ -241,6 +246,7 @@ export function AdminApp() {
         page === 'cash' ||
         page === 'payments' ||
         page === 'production' ||
+        page === 'complements' ||
         page === 'team'
       )
         for (const path of relevant) if (path !== 'settings') relevant.delete(path);
@@ -344,985 +350,897 @@ export function AdminApp() {
     list(p).map((x) => ({ id: x.id, name: x.name ?? x.number ?? x.id.slice(0, 8) }));
   const currentPage = nav.find((n) => n[0] === page) ?? ['notfound', 'help', 'Tela não encontrada'];
   return (
-    <ManagementShortcutProvider
-      key={scopeKey}
-      destinations={visibleNav.map(([id, icon, label]) => ({
-        id,
-        icon: icon as IconName,
-        label,
-        path: adminPaths[id],
-      }))}
-      canRead={can('ticket.view') && can('ticket.redeem')}
-      onNavigate={(path) => {
-        setSidebarOpen(false);
-        void navigate(path);
-      }}
-      onDelivered={load}
-      onCounter={
-        can('order.create') && can('payment.receive') ? () => setCounterOpen(true) : undefined
-      }
-    >
-      <PrintBridgeProvider key={scopeKey} scope={scopeKey} allowed={can('print.manage')}>
-        <div
-          className={`admin-layout ${sidebarOpen ? 'sidebar-open' : ''} ${sidebar.compact ? 'sidebar-collapsed' : ''}`}
-        >
-          {sidebarOpen && (
-            <button
-              className="sidebar-backdrop"
-              aria-label="Fechar menu"
-              onClick={() => setSidebarOpen(false)}
-            />
-          )}
-          <aside id="admin-sidebar" className="sidebar" aria-label="Menu lateral">
-            <div className="sidebar-brand">
-              <BranchSwitcher />
+    <AiAssistantProvider allowed={Boolean(current?.actor?.isAccountAdmin)} scopeKey={scopeKey}>
+      <ManagementShortcutProvider
+        key={scopeKey}
+        destinations={visibleNav.map(([id, icon, label]) => ({
+          id,
+          icon: icon as IconName,
+          label,
+          path: adminPaths[id],
+        }))}
+        canRead={can('ticket.view') && can('ticket.redeem')}
+        onNavigate={(path) => {
+          setSidebarOpen(false);
+          void navigate(path);
+        }}
+        onDelivered={load}
+        onCounter={
+          can('order.create') && can('payment.receive') ? () => setCounterOpen(true) : undefined
+        }
+      >
+        <PrintBridgeProvider key={scopeKey} scope={scopeKey} allowed={can('print.manage')}>
+          <div
+            className={`admin-layout ${sidebarOpen ? 'sidebar-open' : ''} ${sidebar.compact ? 'sidebar-collapsed' : ''}`}
+          >
+            {sidebarOpen && (
               <button
-                className="icon-button mobile-menu-close"
+                className="sidebar-backdrop"
                 aria-label="Fechar menu"
                 onClick={() => setSidebarOpen(false)}
-              >
-                <Icon name="close" />
-              </button>
-            </div>
-            <nav aria-label="Navegação principal">
-              {visibleNav.filter(([key]) => key === 'overview').map(renderNavItem)}
-              {[
-                { label: 'Operação', icon: 'tables', pages: ['floor', 'orders', 'production'] },
-                {
-                  label: 'Gerenciamento',
-                  icon: 'folder',
-                  pages: ['menu', 'inventory', 'printing'],
-                },
-                { label: 'Financeiro', icon: 'payments', pages: ['finance', 'payments', 'cash'] },
-              ].map((group) => {
-                const entries = visibleNav.filter(([key]) => group.pages.includes(key));
-                if (!entries.length) return null;
-                const closed = !sidebar.compact && collapsed.includes(group.label);
-                return (
-                  <div
-                    className="nav-group"
-                    key={group.label}
-                    role="group"
-                    aria-label={group.label}
-                  >
-                    <button
-                      className="nav-group-toggle"
-                      aria-expanded={!closed}
-                      onClick={() =>
-                        setCollapsed(
-                          closed
-                            ? collapsed.filter((name) => name !== group.label)
-                            : [...collapsed, group.label],
-                        )
-                      }
-                    >
-                      <Icon name={group.icon as IconName} />
-                      <span>{group.label}</span>
-                      <Icon name="chevron" size={16} />
-                    </button>
-                    {!closed && <div className="nav-group-items">{entries.map(renderNavItem)}</div>}
-                  </div>
-                );
-              })}
-              {visibleNav.filter(([key]) => ['team', 'settings'].includes(key)).map(renderNavItem)}
-            </nav>
-            <div className="sidebar-bottom">
-              <div className="sidebar-user">
-                <strong>{current.name ?? 'Administrador'}</strong>
-                <span>
-                  {current.slug ?? 'Estabelecimento'}
-                  <Clock />
-                </span>
+              />
+            )}
+            <aside id="admin-sidebar" className="sidebar" aria-label="Menu lateral">
+              <div className="sidebar-brand">
+                <BranchSwitcher />
+                <button
+                  className="icon-button mobile-menu-close"
+                  aria-label="Fechar menu"
+                  onClick={() => setSidebarOpen(false)}
+                >
+                  <Icon name="close" />
+                </button>
               </div>
-              <button
-                className="logout-button"
-                aria-label="Sair"
-                title="Sair"
-                onClick={() => void signOut()}
-              >
-                <Icon name="logout" size={18} />
-                <span className="sidebar-logout-label">Sair</span>
-              </button>
-            </div>
-          </aside>
-          <main className="admin-main">
-            <header className="topbar">
-              <div className="topbar-heading">
-                <button
-                  className="icon-button desktop-menu-button"
-                  aria-label={sidebar.collapsed ? 'Expandir menu lateral' : 'Recolher menu lateral'}
-                  title={sidebar.collapsed ? 'Expandir menu lateral' : 'Recolher menu lateral'}
-                  aria-expanded={!sidebar.collapsed}
-                  aria-controls="admin-sidebar"
-                  onClick={sidebar.toggle}
-                >
-                  <Icon name={sidebar.collapsed ? 'sidebar-open' : 'sidebar-close'} />
-                </button>
-                <button
-                  className="icon-button mobile-menu-button"
-                  aria-label="Abrir menu"
-                  aria-controls="admin-sidebar"
-                  aria-expanded={sidebarOpen}
-                  onClick={() => setSidebarOpen(true)}
-                >
-                  <Icon name="bars" />
-                </button>
-                <div>
-                  <span className="topbar-label">MESA</span>
-                  <span className="topbar-title">
-                    {page === 'overview' ? 'Dashboard' : currentPage[2]}
+              <nav aria-label="Navegação principal">
+                {visibleNav.filter(([key]) => key === 'overview').map(renderNavItem)}
+                {[
+                  { label: 'Operação', icon: 'tables', pages: ['floor', 'orders', 'production'] },
+                  {
+                    label: 'Gerenciamento',
+                    icon: 'folder',
+                    pages: ['menu', 'inventory', 'printing'],
+                  },
+                  { label: 'Financeiro', icon: 'payments', pages: ['finance', 'payments', 'cash'] },
+                ].map((group) => {
+                  const entries = visibleNav.filter(([key]) => group.pages.includes(key));
+                  if (!entries.length) return null;
+                  const closed = !sidebar.compact && collapsed.includes(group.label);
+                  return (
+                    <div
+                      className="nav-group"
+                      key={group.label}
+                      role="group"
+                      aria-label={group.label}
+                    >
+                      <button
+                        className="nav-group-toggle"
+                        aria-expanded={!closed}
+                        onClick={() =>
+                          setCollapsed(
+                            closed
+                              ? collapsed.filter((name) => name !== group.label)
+                              : [...collapsed, group.label],
+                          )
+                        }
+                      >
+                        <Icon name={group.icon as IconName} />
+                        <span>{group.label}</span>
+                        <Icon name="chevron" size={16} />
+                      </button>
+                      {!closed && (
+                        <div className="nav-group-items">{entries.map(renderNavItem)}</div>
+                      )}
+                    </div>
+                  );
+                })}
+                {visibleNav
+                  .filter(([key]) => ['team', 'complements', 'settings'].includes(key))
+                  .map(renderNavItem)}
+              </nav>
+              <div className="sidebar-bottom">
+                <div className="sidebar-user">
+                  <strong>{current.name ?? 'Administrador'}</strong>
+                  <span>
+                    {current.slug ?? 'Estabelecimento'}
+                    <Clock />
                   </span>
                 </div>
+                <button
+                  className="logout-button"
+                  aria-label="Sair"
+                  title="Sair"
+                  onClick={() => void signOut()}
+                >
+                  <Icon name="logout" size={18} />
+                  <span className="sidebar-logout-label">Sair</span>
+                </button>
               </div>
-              <div className="header-actions">
-                {(can('settings.update') || can('cash.manage')) && (
-                  <OperationControl key={scopeKey} scopeKey={scopeKey} onChange={load} />
-                )}
-                {can('print.manage') && (
-                  <PrintBridgeIndicator
-                    onOpen={() => void navigate('/impressao?aba=printbridge')}
-                  />
-                )}
-                <PushDeviceButton key={scopeKey} surface="admin" />
-                <span className="topbar-venue">{data.settings?.name ?? current.slug}</span>
-                <div className="notifications">
+            </aside>
+            <main className="admin-main">
+              <header className="topbar">
+                <div className="topbar-heading">
                   <button
-                    className="icon-button"
-                    aria-label="Notificações"
-                    aria-expanded={notificationsOpen}
-                    onClick={() => setNotificationsOpen(!notificationsOpen)}
+                    className="icon-button desktop-menu-button"
+                    aria-label={
+                      sidebar.collapsed ? 'Expandir menu lateral' : 'Recolher menu lateral'
+                    }
+                    title={sidebar.collapsed ? 'Expandir menu lateral' : 'Recolher menu lateral'}
+                    aria-expanded={!sidebar.collapsed}
+                    aria-controls="admin-sidebar"
+                    onClick={sidebar.toggle}
                   >
-                    <Icon name="bell" />
-                    {data.dashboard?.service_requests > 0 && <i className="notification-dot" />}
+                    <Icon name={sidebar.collapsed ? 'sidebar-open' : 'sidebar-close'} />
                   </button>
-                  {notificationsOpen && (
-                    <section
-                      className="notification-panel"
-                      role="region"
-                      aria-label="Resumo de atendimento"
+                  <button
+                    className="icon-button mobile-menu-button"
+                    aria-label="Abrir menu"
+                    aria-controls="admin-sidebar"
+                    aria-expanded={sidebarOpen}
+                    onClick={() => setSidebarOpen(true)}
+                  >
+                    <Icon name="bars" />
+                  </button>
+                  <div>
+                    <span className="topbar-label">MESA</span>
+                    <span className="topbar-title">
+                      {page === 'overview' ? 'Dashboard' : currentPage[2]}
+                    </span>
+                  </div>
+                </div>
+                <div className="header-actions">
+                  {(can('settings.update') || can('cash.manage')) && (
+                    <OperationControl key={scopeKey} scopeKey={scopeKey} onChange={load} />
+                  )}
+                  {can('print.manage') && (
+                    <PrintBridgeIndicator
+                      onOpen={() => void navigate('/impressao?aba=printbridge')}
+                    />
+                  )}
+                  <PushDeviceButton key={scopeKey} surface="admin" />
+                  <span className="topbar-venue">{data.settings?.name ?? current.slug}</span>
+                  <div className="notifications">
+                    <button
+                      className="icon-button"
+                      aria-label="Notificações"
+                      aria-expanded={notificationsOpen}
+                      onClick={() => setNotificationsOpen(!notificationsOpen)}
                     >
-                      <h3>Resumo de atendimento</h3>
-                      <p>
-                        {data.dashboard?.service_requests ?? 0} chamado(s) aguardando atendimento.
-                      </p>
-                      <p>{data.dashboard?.pending_prints ?? 0} impressão(ões) pendente(s).</p>
-                      {can('ticket.redeem') && (
+                      <Icon name="bell" />
+                      {data.dashboard?.service_requests > 0 && <i className="notification-dot" />}
+                    </button>
+                    {notificationsOpen && (
+                      <section
+                        className="notification-panel"
+                        role="region"
+                        aria-label="Resumo de atendimento"
+                      >
+                        <h3>Resumo de atendimento</h3>
+                        <p>
+                          {data.dashboard?.service_requests ?? 0} chamado(s) aguardando atendimento.
+                        </p>
+                        <p>{data.dashboard?.pending_prints ?? 0} impressão(ões) pendente(s).</p>
+                        {can('ticket.redeem') && (
+                          <button
+                            onClick={() => {
+                              setRequestCenterScope(scopeKey);
+                              setNotificationsOpen(false);
+                            }}
+                          >
+                            <Icon name="bell" size={16} />
+                            Ver solicitações
+                          </button>
+                        )}
                         <button
                           onClick={() => {
-                            setRequestCenterScope(scopeKey);
+                            setPage('floor');
                             setNotificationsOpen(false);
                           }}
                         >
-                          <Icon name="bell" size={16} />
-                          Ver solicitações
+                          Ver salão
                         </button>
-                      )}
-                      <button
-                        onClick={() => {
-                          setPage('floor');
-                          setNotificationsOpen(false);
-                        }}
-                      >
-                        Ver salão
-                      </button>
-                    </section>
-                  )}
-                </div>
-                <ThemeToggle />
-              </div>
-            </header>
-            <div className="page-content">
-              <Connectivity />
-              {page !== 'orders' &&
-                page !== 'menu' &&
-                page !== 'inventory' &&
-                page !== 'finance' &&
-                page !== 'cash' &&
-                page !== 'payments' &&
-                page !== 'production' &&
-                page !== 'team' && (
-                  <PageTitle
-                    eyebrow={page === 'menu' || page === 'team' ? 'CADASTRO' : 'OPERAÇÃO'}
-                    title={page === 'overview' ? 'Dashboard' : currentPage[2]}
-                    subtitle={
-                      page === 'overview'
-                        ? 'Indicadores de mesas, pedidos, atendimento e operação.'
-                        : (
-                            {
-                              floor:
-                                'Escolha a mesa para lançar pedidos, acompanhar comandas ou encerrar o atendimento.',
-                              orders:
-                                'Pedidos e fichas organizados por mesa e comanda. Consulte os itens e acompanhe cada entrega.',
-                              menu: 'Organize produtos, preços, variações e adicionais do cardápio.',
-                              payments:
-                                'Confira recebimentos e estornos antes de encerrar as comandas.',
-                              cash: 'Abra um turno, registre movimentações e confira o dinheiro no fechamento.',
-                              inventory:
-                                'Acompanhe saldos e registre entradas, perdas e ajustes com motivo.',
-                              settings: 'Defina as políticas e a aparência deste estabelecimento.',
-                              printing:
-                                'Configure os dispositivos e acompanhe a fila de impressão.',
-                              production:
-                                'Inicie o preparo e sinalize os itens prontos para entrega.',
-                              team: 'Cadastre pessoas e defina o que cada perfil pode acessar.',
-                            } as Record<string, string>
-                          )[page]
-                    }
-                    action={
-                      <button onClick={() => void load()} disabled={busy}>
-                        <Icon name="refresh" size={16} /> Recarregar
-                      </button>
-                    }
-                  />
-                )}
-              {feedback}
-              <ClientRequestBanner
-                tables={list('tables')}
-                onOpen={can('ticket.redeem') ? () => setRequestCenterScope(scopeKey) : undefined}
-              />
-              {page === 'notfound' && (
-                <RouteNotFound onHome={() => setPage(visibleNav[0]?.[0] ?? 'overview')} />
-              )}
-              {page === 'overview' && (
-                <>
-                  <div className="metrics">
-                    <Metric
-                      label="Mesas em atendimento"
-                      value={`${data.dashboard?.occupied ?? 0} / ${data.dashboard?.tables ?? 0}`}
-                      detail="O salão agora"
-                      icon="tables"
-                    />
-                    <Metric
-                      label="Saldo em aberto"
-                      value={brl(data.dashboard?.outstanding)}
-                      detail="Consumo aguardando recebimento"
-                      icon="payments"
-                    />
-                    <Metric
-                      label="Chamados abertos"
-                      value={String(data.dashboard?.service_requests ?? 0)}
-                      detail="Sua equipe em movimento"
-                      icon="team"
-                    />
-                    <Metric
-                      label="Impressões pendentes"
-                      value={String(data.dashboard?.pending_prints ?? 0)}
-                      detail="Fila de documentos"
-                      icon="printing"
-                    />
-                    <Metric
-                      label="Pedidos confirmados"
-                      value={String(list('orders').filter((o) => o.status === 'CONFIRMED').length)}
-                      detail="pedidos registrados na unidade"
-                      icon="orders"
-                    />
-                    <Metric
-                      label="Produtos disponíveis"
-                      value={String(list('products').filter((p) => p.enabled).length)}
-                      detail="itens ativos no cardápio"
-                      icon="menu"
-                    />
+                      </section>
+                    )}
                   </div>
-                  <CustomerLinkPanel />
-                  <section className="panel dashboard-filters">
-                    <div>
-                      <h2>Salão</h2>
-                      <p className="muted small">
-                        Filtre as mesas para iniciar ou continuar um atendimento.
-                      </p>
+                  <ThemeToggle />
+                </div>
+              </header>
+              <div className="page-content">
+                <Connectivity />
+                {page !== 'orders' &&
+                  page !== 'menu' &&
+                  page !== 'inventory' &&
+                  page !== 'finance' &&
+                  page !== 'cash' &&
+                  page !== 'payments' &&
+                  page !== 'production' &&
+                  page !== 'team' &&
+                  page !== 'complements' && (
+                    <PageTitle
+                      eyebrow={page === 'menu' || page === 'team' ? 'CADASTRO' : 'OPERAÇÃO'}
+                      title={page === 'overview' ? 'Dashboard' : currentPage[2]}
+                      subtitle={
+                        page === 'overview'
+                          ? 'Indicadores de mesas, pedidos, atendimento e operação.'
+                          : (
+                              {
+                                floor:
+                                  'Escolha a mesa para lançar pedidos, acompanhar comandas ou encerrar o atendimento.',
+                                orders:
+                                  'Pedidos e fichas organizados por mesa e comanda. Consulte os itens e acompanhe cada entrega.',
+                                menu: 'Organize produtos, preços, variações e adicionais do cardápio.',
+                                payments:
+                                  'Confira recebimentos e estornos antes de encerrar as comandas.',
+                                cash: 'Abra um turno, registre movimentações e confira o dinheiro no fechamento.',
+                                inventory:
+                                  'Acompanhe saldos e registre entradas, perdas e ajustes com motivo.',
+                                settings:
+                                  'Defina as políticas e a aparência deste estabelecimento.',
+                                printing:
+                                  'Configure os dispositivos e acompanhe a fila de impressão.',
+                                production:
+                                  'Inicie o preparo e sinalize os itens prontos para entrega.',
+                                team: 'Cadastre pessoas e defina o que cada perfil pode acessar.',
+                              } as Record<string, string>
+                            )[page]
+                      }
+                      action={
+                        <button onClick={() => void load()} disabled={busy}>
+                          <Icon name="refresh" size={16} /> Recarregar
+                        </button>
+                      }
+                    />
+                  )}
+                {feedback}
+                <ClientRequestBanner
+                  tables={list('tables')}
+                  onOpen={can('ticket.redeem') ? () => setRequestCenterScope(scopeKey) : undefined}
+                />
+                {page === 'notfound' && (
+                  <RouteNotFound onHome={() => setPage(visibleNav[0]?.[0] ?? 'overview')} />
+                )}
+                {page === 'overview' && (
+                  <>
+                    <div className="ai-page-actions">
+                      <AiSummaryButton>Resumir operação com IA</AiSummaryButton>
                     </div>
-                    <div className="filter-fields">
-                      <label>
-                        <span>Buscar mesa</span>
-                        <span className="input-icon">
-                          <Icon name="search" size={17} />
-                          <input
-                            aria-label="Buscar mesa"
-                            placeholder="Número da mesa"
-                            value={tableSearch}
-                            onChange={(e) => setTableSearch(e.target.value)}
+                    <div className="metrics">
+                      <Metric
+                        label="Mesas em atendimento"
+                        value={`${data.dashboard?.occupied ?? 0} / ${data.dashboard?.tables ?? 0}`}
+                        detail="O salão agora"
+                        icon="tables"
+                      />
+                      <Metric
+                        label="Saldo em aberto"
+                        value={brl(data.dashboard?.outstanding)}
+                        detail="Consumo aguardando recebimento"
+                        icon="payments"
+                      />
+                      <Metric
+                        label="Chamados abertos"
+                        value={String(data.dashboard?.service_requests ?? 0)}
+                        detail="Sua equipe em movimento"
+                        icon="team"
+                      />
+                      <Metric
+                        label="Impressões pendentes"
+                        value={String(data.dashboard?.pending_prints ?? 0)}
+                        detail="Fila de documentos"
+                        icon="printing"
+                      />
+                      <Metric
+                        label="Pedidos confirmados"
+                        value={String(
+                          list('orders').filter((o) => o.status === 'CONFIRMED').length,
+                        )}
+                        detail="pedidos registrados na unidade"
+                        icon="orders"
+                      />
+                      <Metric
+                        label="Produtos disponíveis"
+                        value={String(list('products').filter((p) => p.enabled).length)}
+                        detail="itens ativos no cardápio"
+                        icon="menu"
+                      />
+                    </div>
+                    <CustomerLinkPanel />
+                    <section className="panel dashboard-filters">
+                      <div>
+                        <h2>Salão</h2>
+                        <p className="muted small">
+                          Filtre as mesas para iniciar ou continuar um atendimento.
+                        </p>
+                      </div>
+                      <div className="filter-fields">
+                        <label>
+                          <span>Buscar mesa</span>
+                          <span className="input-icon">
+                            <Icon name="search" size={17} />
+                            <input
+                              aria-label="Buscar mesa"
+                              placeholder="Número da mesa"
+                              value={tableSearch}
+                              onChange={(e) => setTableSearch(e.target.value)}
+                            />
+                          </span>
+                        </label>
+                        <label>
+                          Situação
+                          <SearchSelect
+                            label={'Situação'}
+                            options={[
+                              { id: String('ALL'), name: 'Todas as mesas' },
+                              { id: String('FREE'), name: 'Livres' },
+                              { id: String('OCCUPIED'), name: 'Em atendimento' },
+                            ]}
+                            value={String(tableStatus ?? '')}
+                            onChange={(nextValue: string) => setTableStatus(nextValue)}
+                            allowClear={false}
                           />
-                        </span>
-                      </label>
-                      <label>
-                        Situação
-                        <SearchSelect
-                          label={'Situação'}
-                          options={[
-                            { id: String('ALL'), name: 'Todas as mesas' },
-                            { id: String('FREE'), name: 'Livres' },
-                            { id: String('OCCUPIED'), name: 'Em atendimento' },
-                          ]}
-                          value={String(tableStatus ?? '')}
-                          onChange={(nextValue: string) => setTableStatus(nextValue)}
-                          allowClear={false}
+                        </label>
+                      </div>
+                    </section>
+                    <div className="dashboard-grid">
+                      <section className="panel">
+                        <div className="section-head">
+                          <div>
+                            <h2>Mesas do estabelecimento</h2>
+                            <p className="muted small">Escolha uma mesa para atender.</p>
+                          </div>
+                          <div className="legend">
+                            <i className="green" /> Livre <i className="gold" /> Em atendimento
+                          </div>
+                        </div>
+                        <Floor
+                          tables={list('tables').filter(
+                            (t) =>
+                              t.number.toLowerCase().includes(tableSearch.toLowerCase()) &&
+                              (tableStatus === 'ALL' ||
+                                (tableStatus === 'FREE'
+                                  ? t.status === 'FREE'
+                                  : t.status !== 'FREE')),
+                          )}
+                          onSelect={setSelected}
                         />
-                      </label>
+                      </section>
+                      <section className="panel operation-panel">
+                        <div className="section-head">
+                          <h2>Atendimento</h2>
+                          <span className="online-dot" />
+                        </div>
+                        <p className="muted small">Situação atual do estabelecimento.</p>
+                        <div className="operation-summary">
+                          <span>Estabelecimento</span>
+                          <Badge
+                            status={
+                              businessAvailability({
+                                is_open: data.settings?.is_open,
+                                opening_hours: data.settings?.opening_hours,
+                              }).is_open
+                                ? 'AVAILABLE'
+                                : 'CLOSED'
+                            }
+                          />
+                        </div>
+                        <div className="operation-summary">
+                          <span>Mesas livres</span>
+                          <strong>
+                            {list('tables').filter((t) => t.status === 'FREE').length}
+                          </strong>
+                        </div>
+                        <div className="operation-summary">
+                          <span>Em atendimento</span>
+                          <strong>{data.dashboard?.occupied ?? 0}</strong>
+                        </div>
+                        <div className="operation-summary">
+                          <span>Chamados abertos</span>
+                          <strong>{data.dashboard?.service_requests ?? 0}</strong>
+                        </div>
+                        <button className="primary full" onClick={() => setPage('floor')}>
+                          <Icon name="tables" size={17} />
+                          Abrir salão{' '}
+                          <kbd className="management-keycap" aria-hidden="true">
+                            F2
+                          </kbd>
+                        </button>
+                        <button className="full" onClick={() => setPage('orders')}>
+                          <Icon name="orders" size={17} />
+                          Consultar pedidos
+                        </button>
+                      </section>
                     </div>
-                  </section>
-                  <div className="dashboard-grid">
                     <section className="panel">
                       <div className="section-head">
-                        <div>
-                          <h2>Mesas do estabelecimento</h2>
-                          <p className="muted small">Escolha uma mesa para atender.</p>
-                        </div>
-                        <div className="legend">
-                          <i className="green" /> Livre <i className="gold" /> Em atendimento
-                        </div>
+                        <h2>Últimos pedidos</h2>
+                        <button className="text-button" onClick={() => setPage('orders')}>
+                          <Icon name="next" size={16} /> Ver todos
+                        </button>
                       </div>
-                      <Floor
-                        tables={list('tables').filter(
-                          (t) =>
-                            t.number.toLowerCase().includes(tableSearch.toLowerCase()) &&
-                            (tableStatus === 'ALL' ||
-                              (tableStatus === 'FREE' ? t.status === 'FREE' : t.status !== 'FREE')),
-                        )}
+                      <OrderList
+                        orders={list('orders').slice(0, 5)}
+                        onSelect={(o) => void showOrder(o)}
+                      />
+                    </section>
+                  </>
+                )}
+                {page === 'floor' && tableId && data.tables && !selected && (
+                  <RouteNotFound onHome={() => setPage('floor')} />
+                )}
+                {page === 'floor' && (
+                  <Tabs label="Salão">
+                    <Tab id="floor-0" label="Mapa do salão" icon="tables">
+                      <FloorOverview
+                        tables={list('tables')}
+                        areas={list('areas')}
                         onSelect={setSelected}
                       />
-                    </section>
-                    <section className="panel operation-panel">
-                      <div className="section-head">
-                        <h2>Atendimento</h2>
-                        <span className="online-dot" />
-                      </div>
-                      <p className="muted small">Situação atual do estabelecimento.</p>
-                      <div className="operation-summary">
-                        <span>Estabelecimento</span>
-                        <Badge
-                          status={
-                            businessAvailability({
-                              is_open: data.settings?.is_open,
-                              opening_hours: data.settings?.opening_hours,
-                            }).is_open
-                              ? 'AVAILABLE'
-                              : 'CLOSED'
-                          }
+                    </Tab>
+                    {can('table.manage') && (
+                      <Tab id="floor-layout" label="Posicionar mesas" icon="edit">
+                        <FloorEditor
+                          tables={list('tables')}
+                          areas={list('areas')}
+                          onChange={load}
                         />
-                      </div>
-                      <div className="operation-summary">
-                        <span>Mesas livres</span>
-                        <strong>{list('tables').filter((t) => t.status === 'FREE').length}</strong>
-                      </div>
-                      <div className="operation-summary">
-                        <span>Em atendimento</span>
-                        <strong>{data.dashboard?.occupied ?? 0}</strong>
-                      </div>
-                      <div className="operation-summary">
-                        <span>Chamados abertos</span>
-                        <strong>{data.dashboard?.service_requests ?? 0}</strong>
-                      </div>
-                      <button className="primary full" onClick={() => setPage('floor')}>
-                        <Icon name="tables" size={17} />
-                        Abrir salão{' '}
-                        <kbd className="management-keycap" aria-hidden="true">
-                          F2
-                        </kbd>
-                      </button>
-                      <button className="full" onClick={() => setPage('orders')}>
-                        <Icon name="orders" size={17} />
-                        Consultar pedidos
-                      </button>
-                    </section>
-                  </div>
-                  <section className="panel">
-                    <div className="section-head">
-                      <h2>Últimos pedidos</h2>
-                      <button className="text-button" onClick={() => setPage('orders')}>
-                        <Icon name="next" size={16} /> Ver todos
-                      </button>
-                    </div>
-                    <OrderList
-                      orders={list('orders').slice(0, 5)}
-                      onSelect={(o) => void showOrder(o)}
-                    />
-                  </section>
-                </>
-              )}
-              {page === 'floor' && tableId && data.tables && !selected && (
-                <RouteNotFound onHome={() => setPage('floor')} />
-              )}
-              {page === 'floor' && (
-                <Tabs label="Salão">
-                  <Tab id="floor-0" label="Mapa do salão">
-                    <FloorOverview
-                      tables={list('tables')}
-                      areas={list('areas')}
-                      onSelect={setSelected}
-                    />
-                  </Tab>
-                  {can('table.manage') && (
-                    <Tab id="floor-layout" label="Posicionar mesas">
-                      <FloorEditor tables={list('tables')} areas={list('areas')} onChange={load} />
-                    </Tab>
-                  )}
-                  <Tab id="floor-1" label="Mesas">
-                    <Resource
-                      path="tables"
-                      readOnly={!can('table.manage')}
-                      title="Mesas do salão"
-                      renderActions={(table) => <DeleteTableButton table={table} onChange={load} />}
-                      loading={data.tables === undefined}
-                      records={list('tables')}
-                      onChange={load}
-                      fields={[
-                        { key: 'number', label: 'Número', required: true },
-                        {
-                          key: 'capacity',
-                          label: 'Lugares',
-                          type: 'number',
-                          min: 1,
-                          max: 100,
-                          required: true,
-                          initial: 4,
-                        },
-                        { key: 'area_id', label: 'Área', type: 'select', options: opts('areas') },
-                        {
-                          key: 'shape',
-                          label: 'Formato',
-                          type: 'select',
-                          initial: 'square',
-                          options: [
-                            { id: 'square', name: 'Quadrada' },
-                            { id: 'round', name: 'Redonda' },
-                          ],
-                        },
-                        { key: 'enabled', label: 'Ativa', type: 'checkbox', initial: true },
-                      ]}
-                    />
-                  </Tab>
-                  <Tab id="floor-2" label="Áreas">
-                    <Resource
-                      path="areas"
-                      readOnly={!can('table.manage')}
-                      title="Áreas"
-                      loading={data.areas === undefined}
-                      records={list('areas')}
-                      onChange={load}
-                      fields={[{ key: 'name', label: 'Nome', required: true }]}
-                    />
-                  </Tab>
-                </Tabs>
-              )}
-              {page === 'orders' && (
-                <OrdersWorkspace
-                  onNewCounter={
-                    can('order.create') && can('payment.receive')
-                      ? () => setCounterOpen(true)
-                      : undefined
-                  }
-                  onReload={load}
-                  loading={data.orders === undefined}
-                  canViewTickets={can('ticket.view')}
-                  orders={list('orders')}
-                  onDeliver={can('ticket.redeem') ? delivery.deliver : undefined}
-                  tickets={list('tickets')}
-                  tables={list('tables')}
-                  onOrder={(order) => void showOrder(order)}
-                  onTicket={
-                    can('ticket.view')
-                      ? (ticket) => void navigate(`/pedidos/${ticket.order_id}/fichas/${ticket.id}`)
-                      : undefined
-                  }
-                  onNew={
-                    can('order.create')
-                      ? () =>
-                          forms.open({
-                            title: 'Em qual mesa será o pedido?',
-                            description:
-                              'Selecione a mesa. Na próxima etapa você escolhe a comanda e monta o pedido.',
-                            fields: [
-                              {
-                                key: 'table_id',
-                                label: 'Mesa do pedido',
-                                type: 'select',
-                                required: true,
-                                options: list('tables')
-                                  .filter(
-                                    (table) =>
-                                      table.enabled &&
-                                      !['CLOSING', 'AWAITING_RELEASE'].includes(table.status),
-                                  )
-                                  .map((table) => ({
-                                    id: table.id,
-                                    name:
-                                      'Mesa ' +
-                                      table.number +
-                                      ' · ' +
-                                      (table.status === 'FREE' ? 'Livre' : 'Em atendimento'),
-                                  })),
-                              },
-                            ],
-                            submitLabel: 'Continuar para o pedido',
-                            successMessage:
-                              'Mesa selecionada. Monte o pedido e confira os itens antes de confirmar.',
-                            onSubmit: async (values) => values,
-                            onSuccess: (values) => setSelected({ id: values.table_id }),
-                          })
-                      : undefined
-                  }
-                />
-              )}
-              {page === 'menu' && (
-                <section className="catalog-page">
-                  <PageTitle
-                    className="module-page-title"
-                    eyebrow="CADASTRO / CARDÁPIO"
-                    title="Cardápio"
-                    subtitle="Gerencie produtos, categorias, variações e adicionais do cardápio."
-                  />
-                  <Tabs label="Cardápio">
-                    <Tab id="menu-0" label="Produtos">
-                      <ProductsWorkspace
-                        loading={data.products === undefined}
-                        products={list('products')}
-                        categories={list('categories')}
-                        balances={list('inventory/balances')}
-                        canViewInventory={can('inventory.view')}
-                        onChange={load}
-                      />
-                    </Tab>
-                    <Tab id="menu-1" label="Categorias">
+                      </Tab>
+                    )}
+                    <Tab id="floor-1" label="Mesas" icon="tables">
                       <Resource
-                        path="categories"
-                        title="Categorias"
-                        loading={data.categories === undefined}
-                        records={list('categories')}
+                        path="tables"
+                        readOnly={!can('table.manage')}
+                        title="Mesas do salão"
+                        renderActions={(table) => (
+                          <DeleteTableButton table={table} onChange={load} />
+                        )}
+                        loading={data.tables === undefined}
+                        records={list('tables')}
                         onChange={load}
                         fields={[
-                          { key: 'name', label: 'Nome', required: true },
+                          { key: 'number', label: 'Número', required: true },
                           {
-                            key: 'sort_order',
-                            label: 'Ordem',
+                            key: 'capacity',
+                            label: 'Lugares',
                             type: 'number',
-                            initial: 0,
-                            min: -2147483648,
-                            max: 2147483647,
+                            min: 1,
+                            max: 100,
+                            required: true,
+                            initial: 4,
                           },
-                          recordColorField,
+                          { key: 'area_id', label: 'Área', type: 'select', options: opts('areas') },
+                          {
+                            key: 'shape',
+                            label: 'Formato',
+                            type: 'select',
+                            initial: 'square',
+                            options: [
+                              { id: 'square', name: 'Quadrada' },
+                              { id: 'round', name: 'Redonda' },
+                            ],
+                          },
+                          { key: 'enabled', label: 'Ativa', type: 'checkbox', initial: true },
                         ]}
                       />
                     </Tab>
-                    <Tab id="menu-2" label="Adicionais">
-                      <CatalogAddons
-                        groups={list('modifier-groups')}
-                        modifiers={list('modifiers')}
+                    <Tab id="floor-2" label="Áreas" icon="folder">
+                      <Resource
+                        path="areas"
+                        readOnly={!can('table.manage')}
+                        title="Áreas"
+                        loading={data.areas === undefined}
+                        records={list('areas')}
+                        onChange={load}
+                        fields={[{ key: 'name', label: 'Nome', required: true }]}
+                      />
+                    </Tab>
+                  </Tabs>
+                )}
+                {page === 'orders' && (
+                  <OrdersWorkspace
+                    onNewCounter={
+                      can('order.create') && can('payment.receive')
+                        ? () => setCounterOpen(true)
+                        : undefined
+                    }
+                    onReload={load}
+                    loading={data.orders === undefined}
+                    canViewTickets={can('ticket.view')}
+                    orders={list('orders')}
+                    onDeliver={can('ticket.redeem') ? delivery.deliver : undefined}
+                    tickets={list('tickets')}
+                    tables={list('tables')}
+                    onOrder={(order) => void showOrder(order)}
+                    onTicket={
+                      can('ticket.view')
+                        ? (ticket) =>
+                            void navigate(`/pedidos/${ticket.order_id}/fichas/${ticket.id}`)
+                        : undefined
+                    }
+                    onNew={
+                      can('order.create')
+                        ? () =>
+                            forms.open({
+                              title: 'Em qual mesa será o pedido?',
+                              description:
+                                'Selecione a mesa. Na próxima etapa você escolhe a comanda e monta o pedido.',
+                              fields: [
+                                {
+                                  key: 'table_id',
+                                  label: 'Mesa do pedido',
+                                  type: 'select',
+                                  required: true,
+                                  options: list('tables')
+                                    .filter(
+                                      (table) =>
+                                        table.enabled &&
+                                        !['CLOSING', 'AWAITING_RELEASE'].includes(table.status),
+                                    )
+                                    .map((table) => ({
+                                      id: table.id,
+                                      name:
+                                        'Mesa ' +
+                                        table.number +
+                                        ' · ' +
+                                        (table.status === 'FREE' ? 'Livre' : 'Em atendimento'),
+                                    })),
+                                },
+                              ],
+                              submitLabel: 'Continuar para o pedido',
+                              successMessage:
+                                'Mesa selecionada. Monte o pedido e confira os itens antes de confirmar.',
+                              onSubmit: async (values) => values,
+                              onSuccess: (values) => setSelected({ id: values.table_id }),
+                            })
+                        : undefined
+                    }
+                  />
+                )}
+                {page === 'menu' && (
+                  <section className="catalog-page">
+                    <PageTitle
+                      className="module-page-title"
+                      eyebrow="CADASTRO / CARDÁPIO"
+                      title="Cardápio"
+                      subtitle="Gerencie produtos, categorias, variações e adicionais do cardápio."
+                    />
+                    <Tabs label="Cardápio">
+                      <Tab id="menu-0" label="Produtos" icon="menu">
+                        <ProductsWorkspace
+                          loading={data.products === undefined}
+                          products={list('products')}
+                          categories={list('categories')}
+                          balances={list('inventory/balances')}
+                          canViewInventory={can('inventory.view')}
+                          onChange={load}
+                        />
+                      </Tab>
+                      <Tab id="menu-1" label="Categorias" icon="folder">
+                        <Resource
+                          path="categories"
+                          title="Categorias"
+                          loading={data.categories === undefined}
+                          records={list('categories')}
+                          onChange={load}
+                          fields={[
+                            { key: 'name', label: 'Nome', required: true },
+                            {
+                              key: 'sort_order',
+                              label: 'Ordem',
+                              type: 'number',
+                              initial: 0,
+                              min: -2147483648,
+                              max: 2147483647,
+                            },
+                            recordColorField,
+                          ]}
+                        />
+                      </Tab>
+                      <Tab id="menu-2" label="Adicionais" icon="plus">
+                        <CatalogAddons
+                          groups={list('modifier-groups')}
+                          modifiers={list('modifiers')}
+                          onChange={load}
+                        />
+                      </Tab>
+                    </Tabs>
+                  </section>
+                )}
+                {page === 'inventory' && (
+                  <InventoryOverview
+                    loading={data['inventory/balances'] === undefined}
+                    balances={list('inventory/balances')}
+                    catalog={data['inventory/catalog'] ?? {}}
+                    onChange={load}
+                  />
+                )}
+                {page === 'payments' && <PaymentsWorkspace key={scopeKey} can={can} />}
+                {page === 'finance' && <FinanceWorkspace can={can} />}
+                {page === 'cash' && <CashWorkspace key={scopeKey} />}
+                {page === 'production' && <ProductionWorkspace key={scopeKey} />}
+                {page === 'printing' && (
+                  <Tabs label="Impressão">
+                    <Tab id="printbridge" label="PrintBridge" icon="printing">
+                      <PrintBridgePanel printers={list('printers')} />
+                    </Tab>
+                    <Tab id="printing-0" label="Impressoras" icon="printing">
+                      <Resource
+                        path="printers"
+                        title="Impressoras por setor"
+                        loading={data.printers === undefined}
+                        records={list('printers')}
+                        onChange={load}
+                        fields={[
+                          { key: 'name', label: 'Nome', required: true },
+                          { key: 'sector', label: 'Setor', required: true, initial: 'bar' },
+                          { key: 'enabled', label: 'Ativa', type: 'checkbox', initial: true },
+                        ]}
+                      />
+                    </Tab>
+                    <Tab id="printing-2" label="Fila de impressão" icon="receipt">
+                      <PrintQueue
+                        jobs={list('print/jobs')}
+                        printers={list('printers')}
+                        loading={data['print/jobs'] === undefined}
+                        onChange={load}
+                        scopeKey={scopeKey}
+                      />
+                    </Tab>
+                  </Tabs>
+                )}
+                {page === 'team' && <TeamWorkspace key={scopeKey} />}
+                {page === 'complements' && <ComplementsWorkspace key={scopeKey} />}
+                {page === 'settings' && data.settings && (
+                  <Tabs label="Configurações">
+                    <Tab id="general" label="Negócio e aplicativo" icon="settings">
+                      <BusinessSettings key={scopeKey} settings={data.settings} onChange={load} />
+                    </Tab>
+                    <Tab id="operation" label="Funcionamento e cardápio" icon="clock">
+                      <OperationSettings key={scopeKey} settings={data.settings} onChange={load} />
+                    </Tab>
+                    {current.actor.isAccountAdmin && (
+                      <Tab id="push" label="Notificações push" icon="bell">
+                        <PushSettings key={scopeKey} />
+                      </Tab>
+                    )}
+                    <Tab id="appearance" label="Aparência" icon="settings">
+                      <AppearanceSettings
+                        primary={data.settings.primary_color}
+                        sidebar={data.settings.sidebar_color}
                         onChange={load}
                       />
                     </Tab>
                   </Tabs>
-                </section>
-              )}
-              {page === 'inventory' && (
-                <InventoryOverview
-                  loading={data['inventory/balances'] === undefined}
-                  balances={list('inventory/balances')}
-                  catalog={data['inventory/catalog'] ?? {}}
+                )}
+              </div>
+            </main>
+            {counterOpen && (
+              <CounterSaleModal
+                onClose={() => setCounterOpen(false)}
+                onSaved={(order) => {
+                  flushSync(() => setCounterOpen(false));
+                  void load();
+                  void showOrder(order);
+                }}
+              />
+            )}
+            {selected && (
+              <Modal
+                routeBound
+                className="table-management-modal"
+                title={`Mesa ${selected.number}`}
+                heading={
+                  <>
+                    <span className="table-modal-symbol">
+                      <Icon name="tables" size={26} />
+                    </span>
+                    <span>
+                      Gerenciar pedidos — Mesa {selected.number}
+                      <small>Pedidos, comandas e atendimento</small>
+                    </span>
+                  </>
+                }
+                onClose={() => setSelected(null)}
+              >
+                <TablePanel
+                  key={selected.id}
+                  table={selected}
+                  menu={list('products')}
                   onChange={load}
+                  onFinalized={() => setSelected(null)}
+                  onOrder={(id) => void showOrder({ id })}
                 />
-              )}
-              {page === 'payments' && <PaymentsWorkspace key={scopeKey} can={can} />}
-              {page === 'finance' && <FinanceWorkspace can={can} />}
-              {page === 'cash' && <CashWorkspace key={scopeKey} />}
-              {page === 'production' && <ProductionWorkspace key={scopeKey} />}
-              {page === 'printing' && (
-                <Tabs label="Impressão">
-                  <Tab id="printbridge" label="PrintBridge">
-                    <PrintBridgePanel printers={list('printers')} />
-                  </Tab>
-                  <Tab id="printing-0" label="Impressoras">
-                    <Resource
-                      path="printers"
-                      title="Impressoras por setor"
-                      loading={data.printers === undefined}
-                      records={list('printers')}
-                      onChange={load}
-                      fields={[
-                        { key: 'name', label: 'Nome', required: true },
-                        { key: 'sector', label: 'Setor', required: true, initial: 'bar' },
-                        { key: 'enabled', label: 'Ativa', type: 'checkbox', initial: true },
-                      ]}
-                    />
-                  </Tab>
-                  <Tab id="printing-1" label="Agentes">
-                    <section className="panel">
-                      <div className="section-head">
-                        <h2>Agente local</h2>
-                        <button
-                          onClick={() =>
-                            forms.open({
-                              title: 'Criar agente de impressão',
-                              fields: [{ key: 'name', label: 'Nome do agente', required: true }],
-                              description:
-                                'A credencial será exibida uma única vez após o cadastro.',
-                              successMessage: 'Agente de impressão criado.',
-                              onSubmit: (values) => api('/print/agents', values),
-                              onSuccess: (result) =>
-                                setData((previous) => ({ ...previous, newAgent: result })),
-                            })
-                          }
-                        >
-                          Criar credencial do agente
-                        </button>
-                      </div>
-                      {data.newAgent?.token && (
-                        <div className="alert success">
-                          <p>
-                            Credencial exibida uma vez. Configure PRINT_AGENT_TOKEN no agente local.
-                          </p>
-                          <code className="break-all">{data.newAgent.token}</code>
-                        </div>
-                      )}
-                      <p className="muted small">
-                        Uma conexão local envia documentos para a impressora térmica. Concluído
-                        indica envio ao dispositivo.
-                      </p>
-                    </section>
-                  </Tab>
-                  <Tab id="printing-2" label="Fila de impressão">
-                    <PrintQueue
-                      jobs={list('print/jobs')}
-                      printers={list('printers')}
-                      loading={data['print/jobs'] === undefined}
-                      onChange={load}
-                      scopeKey={scopeKey}
-                    />
-                  </Tab>
-                </Tabs>
-              )}
-              {page === 'team' && <TeamWorkspace key={scopeKey} />}
-              {page === 'settings' && data.settings && (
-                <Tabs label="Configurações">
-                  <Tab id="general" label="Negócio e aplicativo">
-                    <section className="panel">
-                      <div className="section-head">
-                        <div>
-                          <h2>Informações do negócio</h2>
-                          <p className="muted small">
-                            Nome e políticas da unidade. O nome e a identidade visual também são
-                            usados no aplicativo e no cardápio.
-                          </p>
-                        </div>
+              </Modal>
+            )}
+            {page === 'orders' && orderId && !document && (
+              <Modal
+                routeBound
+                title={ticketId ? 'Ficha' : 'Pedido'}
+                onClose={() => void navigate('/pedidos')}
+              >
+                {documentLoading ? (
+                  <p role="status">Abrindo o documento…</p>
+                ) : (
+                  <div className="stack">
+                    <h3>Não foi possível abrir este documento</h3>
+                    <p className="muted">
+                      Confira o endereço e se seu perfil tem acesso ao pedido e às fichas nesta
+                      unidade.
+                    </p>
+                    <button onClick={() => retryDocument((value) => value + 1)}>
+                      <Icon name="refresh" size={17} />
+                      Tentar novamente
+                    </button>
+                  </div>
+                )}
+              </Modal>
+            )}
+            {document && (
+              <Modal
+                routeBound
+                className={document.public_number ? undefined : 'order-detail-modal'}
+                focusClose={!document.public_number}
+                heading={
+                  document.public_number ? undefined : <OrderDetailHeading order={document} />
+                }
+                title={
+                  document.public_number
+                    ? `Ficha ${document.public_number}`
+                    : `Pedido ${document.id.slice(0, 8)}`
+                }
+                onClose={() => void navigate(ticketId ? `/pedidos/${orderId}` : '/pedidos')}
+              >
+                {document.public_number ? (
+                  <div className="ticket-document">
+                    <h3>{document.product}</h3>
+                    <p>
+                      {orderLocationLabel(document)} · {document.tab_label} · Pedido{' '}
+                      {shortId(document.order_id)}
+                    </p>
+                    <p className="muted small">
+                      Ficha {document.public_number} · Uma unidade deste produto.
+                    </p>
+                    <Badge status={document.status} />
+                    {can('ticket.redeem') &&
+                      !['REDEEMED', 'CANCELLED'].includes(document.status) && (
                         <button
                           className="primary"
+                          disabled={!canDeliverTicket(document, current.actor.id)}
+                          onClick={() => delivery.deliver(document)}
+                        >
+                          <Icon name="ready" size={17} />
+                          Marcar como entregue
+                        </button>
+                      )}
+                    <Code value={document.token} />
+                    <Code value={document.token} barcode />
+                    <button
+                      onClick={() =>
+                        forms.open({
+                          title: 'Solicitar segunda via',
+                          description:
+                            'A segunda via conserva a mesma ficha e o mesmo direito de consumo.',
+                          fields: [
+                            {
+                              key: 'reason',
+                              label: 'Motivo da segunda via',
+                              type: 'textarea',
+                              required: true,
+                              minLength: 3,
+                            },
+                          ],
+                          successMessage: 'Segunda via adicionada à fila.',
+                          onSubmit: (values) => api('/tickets/' + document.id + '/reprint', values),
+                        })
+                      }
+                    >
+                      <Icon name="printing" size={17} /> Solicitar segunda via
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <OrderSummary
+                      onUpdate={(value) =>
+                        setDocument((current) => (current?.id === value.id ? value : current))
+                      }
+                      onDeliver={can('ticket.redeem') ? delivery.deliver : undefined}
+                      order={document}
+                      onTicket={
+                        can('ticket.view')
+                          ? (ticket) => void navigate(`/pedidos/${document.id}/fichas/${ticket.id}`)
+                          : undefined
+                      }
+                    />
+                    <div className="modal-footer">
+                      {can('table.view') && (
+                        <button
+                          disabled={!document.table_id}
+                          onClick={() => setSelected({ id: document.table_id })}
+                        >
+                          <Icon name="tables" size={17} />
+                          Abrir atendimento atual da mesa
+                        </button>
+                      )}
+                      {document.status === 'DRAFT' && can('order.create') && (
+                        <button
                           onClick={() =>
-                            forms.open({
-                              title: 'Informações do negócio',
-                              fields: [
-                                { key: 'name', label: 'Nome', required: true },
-                                {
-                                  key: 'payment_mode',
-                                  label: 'Regime de pagamento',
-                                  type: 'select',
-                                  required: true,
-                                  options: [
-                                    { id: 'MIXED', name: 'Misto' },
-                                    { id: 'PREPAID_ONLY', name: 'Somente pré-pago' },
-                                    { id: 'POSTPAID_ONLY', name: 'Somente pós-pago' },
-                                  ],
-                                },
-                                {
-                                  key: 'postpaid_limit',
-                                  type: 'currency',
-                                  label: 'Limite de pós-pago por mesa',
-                                  required: true,
-                                },
-                                { key: 'is_open', label: 'Aberto para pedidos', type: 'checkbox' },
-                              ],
-                              initial: {
-                                name: data.settings.name,
-                                payment_mode: data.settings.payment_mode,
-                                postpaid_limit: data.settings.postpaid_limit,
-                                is_open: Boolean(data.settings.is_open),
-                              },
-                              successMessage: 'Configurações salvas.',
-                              onSubmit: async (values) => {
-                                await api('/settings', values, 'PATCH');
-                                await load();
-                              },
+                            void run(async () => {
+                              await api(`/orders/${document.id}/confirm`, {});
+                              void navigate('/pedidos');
+                              await load();
                             })
                           }
                         >
-                          <Icon name="edit" size={16} />
-                          Editar informações
+                          <Icon name="check" size={17} />
+                          Confirmar pedido
                         </button>
-                      </div>
-                      <dl className="settings-summary">
-                        <div>
-                          <dt>Nome</dt>
-                          <dd>{data.settings.name}</dd>
-                        </div>
-                        <div>
-                          <dt>Regime de pagamento</dt>
-                          <dd>
-                            {
-                              {
-                                MIXED: 'Misto',
-                                PREPAID_ONLY: 'Somente pré-pago',
-                                POSTPAID_ONLY: 'Somente pós-pago',
-                              }[data.settings.payment_mode as string]
-                            }
-                          </dd>
-                        </div>
-                        <div>
-                          <dt>Limite por mesa</dt>
-                          <dd>{brl(data.settings.postpaid_limit)}</dd>
-                        </div>
-                        <div>
-                          <dt>Permissão manual de pedidos</dt>
-                          <dd>{data.settings.is_open ? 'Sim' : 'Não'}</dd>
-                        </div>
-                      </dl>
-                      <p className="muted small">
-                        Pagamentos online usam sandbox até a configuração de um gateway real.
-                      </p>
-                    </section>
-                    <PwaSettings settings={data.settings} onChange={load} />
-                  </Tab>
-                  <Tab id="operation" label="Funcionamento e cardápio">
-                    <OperationSettings key={scopeKey} settings={data.settings} onChange={load} />
-                  </Tab>
-                  {current.actor.isAccountAdmin && (
-                    <Tab id="push" label="Notificações push">
-                      <PushSettings key={scopeKey} />
-                    </Tab>
-                  )}
-                  <Tab id="appearance" label="Aparência">
-                    <AppearanceSettings
-                      primary={data.settings.primary_color}
-                      sidebar={data.settings.sidebar_color}
-                      onChange={load}
-                    />
-                  </Tab>
-                </Tabs>
-              )}
-            </div>
-          </main>
-          {counterOpen && (
-            <CounterSaleModal
-              onClose={() => setCounterOpen(false)}
-              onSaved={(order) => {
-                flushSync(() => setCounterOpen(false));
-                void load();
-                void showOrder(order);
-              }}
-            />
-          )}
-          {selected && (
-            <Modal
-              routeBound
-              className="table-management-modal"
-              title={`Mesa ${selected.number}`}
-              heading={
-                <>
-                  <span className="table-modal-symbol">
-                    <Icon name="tables" size={26} />
-                  </span>
-                  <span>
-                    Gerenciar pedidos — Mesa {selected.number}
-                    <small>Pedidos, comandas e atendimento</small>
-                  </span>
-                </>
-              }
-              onClose={() => setSelected(null)}
-            >
-              <TablePanel
-                key={selected.id}
-                table={selected}
-                menu={list('products')}
-                onChange={load}
-                onFinalized={() => setSelected(null)}
-                onOrder={(id) => void showOrder({ id })}
+                      )}
+                      {document.status !== 'CANCELLED' && can('order.cancel') && (
+                        <button className="danger" onClick={() => setCancellingOrder(document)}>
+                          <Icon name="close" size={17} />
+                          Cancelar pedido
+                        </button>
+                      )}
+                    </div>
+                  </>
+                )}
+                {feedback}
+              </Modal>
+            )}
+            {cancellingOrder && (
+              <OrderCancellationDialog
+                order={cancellingOrder}
+                onClose={() => setCancellingOrder(null)}
+                onCancelled={() => {
+                  void load();
+                  void navigate('/pedidos');
+                }}
+                onUpdated={() => void load()}
               />
-            </Modal>
-          )}
-          {page === 'orders' && orderId && !document && (
-            <Modal
-              routeBound
-              title={ticketId ? 'Ficha' : 'Pedido'}
-              onClose={() => void navigate('/pedidos')}
-            >
-              {documentLoading ? (
-                <p role="status">Abrindo o documento…</p>
-              ) : (
-                <div className="stack">
-                  <h3>Não foi possível abrir este documento</h3>
-                  <p className="muted">
-                    Confira o endereço e se seu perfil tem acesso ao pedido e às fichas nesta
-                    unidade.
-                  </p>
-                  <button onClick={() => retryDocument((value) => value + 1)}>
-                    <Icon name="refresh" size={17} />
-                    Tentar novamente
-                  </button>
-                </div>
-              )}
-            </Modal>
-          )}
-          {document && (
-            <Modal
-              routeBound
-              className={document.public_number ? undefined : 'order-detail-modal'}
-              focusClose={!document.public_number}
-              heading={document.public_number ? undefined : <OrderDetailHeading order={document} />}
-              title={
-                document.public_number
-                  ? `Ficha ${document.public_number}`
-                  : `Pedido ${document.id.slice(0, 8)}`
-              }
-              onClose={() => void navigate(ticketId ? `/pedidos/${orderId}` : '/pedidos')}
-            >
-              {document.public_number ? (
-                <div className="ticket-document">
-                  <h3>{document.product}</h3>
-                  <p>
-                    {orderLocationLabel(document)} · {document.tab_label} · Pedido{' '}
-                    {shortId(document.order_id)}
-                  </p>
-                  <p className="muted small">
-                    Ficha {document.public_number} · Uma unidade deste produto.
-                  </p>
-                  <Badge status={document.status} />
-                  {can('ticket.redeem') && !['REDEEMED', 'CANCELLED'].includes(document.status) && (
-                    <button
-                      className="primary"
-                      disabled={!canDeliverTicket(document, current.actor.id)}
-                      onClick={() => delivery.deliver(document)}
-                    >
-                      <Icon name="ready" size={17} />
-                      Marcar como entregue
-                    </button>
-                  )}
-                  <Code value={document.token} />
-                  <Code value={document.token} barcode />
-                  <button
-                    onClick={() =>
-                      forms.open({
-                        title: 'Solicitar segunda via',
-                        description:
-                          'A segunda via conserva a mesma ficha e o mesmo direito de consumo.',
-                        fields: [
-                          {
-                            key: 'reason',
-                            label: 'Motivo da segunda via',
-                            type: 'textarea',
-                            required: true,
-                            minLength: 3,
-                          },
-                        ],
-                        successMessage: 'Segunda via adicionada à fila.',
-                        onSubmit: (values) => api('/tickets/' + document.id + '/reprint', values),
-                      })
-                    }
-                  >
-                    <Icon name="printing" size={17} /> Solicitar segunda via
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <OrderSummary
-                    onUpdate={(value) =>
-                      setDocument((current) => (current?.id === value.id ? value : current))
-                    }
-                    onDeliver={can('ticket.redeem') ? delivery.deliver : undefined}
-                    order={document}
-                    onTicket={
-                      can('ticket.view')
-                        ? (ticket) => void navigate(`/pedidos/${document.id}/fichas/${ticket.id}`)
-                        : undefined
-                    }
-                  />
-                  <div className="modal-footer">
-                    {can('table.view') && (
-                      <button
-                        disabled={!document.table_id}
-                        onClick={() => setSelected({ id: document.table_id })}
-                      >
-                        <Icon name="tables" size={17} />
-                        Abrir atendimento atual da mesa
-                      </button>
-                    )}
-                    {document.status === 'DRAFT' && can('order.create') && (
-                      <button
-                        onClick={() =>
-                          void run(async () => {
-                            await api(`/orders/${document.id}/confirm`, {});
-                            void navigate('/pedidos');
-                            await load();
-                          })
+            )}
+            {forms.dialog}
+            {requestCenterScope === scopeKey && can('ticket.redeem') && (
+              <Modal
+                title="Solicitações de clientes"
+                className="request-center-modal"
+                onClose={() => setRequestCenterScope(null)}
+              >
+                <ClientRequestList
+                  requests={list('service-requests')}
+                  loading={data['service-requests'] === undefined}
+                  onChange={load}
+                  onDeliver={delivery.deliver}
+                  onOrder={
+                    can('table.view')
+                      ? (ticket) => {
+                          setRequestCenterScope(null);
+                          void showOrder({ id: ticket.order_id });
                         }
-                      >
-                        <Icon name="check" size={17} />
-                        Confirmar pedido
-                      </button>
-                    )}
-                    {document.status !== 'CANCELLED' && can('order.cancel') && (
-                      <button className="danger" onClick={() => setCancellingOrder(document)}>
-                        <Icon name="close" size={17} />
-                        Cancelar pedido
-                      </button>
-                    )}
-                  </div>
-                </>
-              )}
-              {feedback}
-            </Modal>
-          )}
-          {cancellingOrder && (
-            <OrderCancellationDialog
-              order={cancellingOrder}
-              onClose={() => setCancellingOrder(null)}
-              onCancelled={() => {
-                void load();
-                void navigate('/pedidos');
-              }}
-              onUpdated={() => void load()}
-            />
-          )}
-          {forms.dialog}
-          {requestCenterScope === scopeKey && can('ticket.redeem') && (
-            <Modal
-              title="Solicitações de clientes"
-              className="request-center-modal"
-              onClose={() => setRequestCenterScope(null)}
-            >
-              <ClientRequestList
-                requests={list('service-requests')}
-                loading={data['service-requests'] === undefined}
-                onChange={load}
-                onDeliver={delivery.deliver}
-                onOrder={
-                  can('table.view')
-                    ? (ticket) => {
-                        setRequestCenterScope(null);
-                        void showOrder({ id: ticket.order_id });
-                      }
-                    : undefined
-                }
-                onTicket={
-                  can('ticket.view')
-                    ? (ticket) => {
-                        setRequestCenterScope(null);
-                        void navigate(`/pedidos/${ticket.order_id}/fichas/${ticket.id}`);
-                      }
-                    : undefined
-                }
-                onTable={
-                  can('table.view')
-                    ? (ticket) => {
-                        setRequestCenterScope(null);
-                        setSelected({ id: ticket.table_id });
-                      }
-                    : undefined
-                }
-              />
-            </Modal>
-          )}
-          {delivery.dialog}
-          <ManagementShortcutBar />
-        </div>
-      </PrintBridgeProvider>
-    </ManagementShortcutProvider>
+                      : undefined
+                  }
+                  onTicket={
+                    can('ticket.view')
+                      ? (ticket) => {
+                          setRequestCenterScope(null);
+                          void navigate(`/pedidos/${ticket.order_id}/fichas/${ticket.id}`);
+                        }
+                      : undefined
+                  }
+                  onTable={
+                    can('table.view')
+                      ? (ticket) => {
+                          setRequestCenterScope(null);
+                          setSelected({ id: ticket.table_id });
+                        }
+                      : undefined
+                  }
+                />
+              </Modal>
+            )}
+            {delivery.dialog}
+            <ManagementShortcutBar />
+          </div>
+        </PrintBridgeProvider>
+      </ManagementShortcutProvider>
+    </AiAssistantProvider>
   );
   function renderNavItem([key, icon, label]: string[]) {
     return (

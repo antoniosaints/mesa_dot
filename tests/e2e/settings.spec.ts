@@ -42,9 +42,10 @@ test('negócio e aplicativo compartilham aba, nome e endereço sem repetir o cad
   page,
   request,
 }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
   await login(page);
   const tabs = page.getByRole('tablist', { name: 'Configurações', exact: true });
-  await expect(tabs.getByRole('tab')).toHaveCount(3);
+  await expect(tabs.getByRole('tab')).toHaveCount(4);
   await expect(tabs.getByRole('tab', { name: 'Aplicativo PWA', exact: true })).toHaveCount(0);
   await expect(
     page.getByRole('heading', { name: 'Informações do negócio', exact: true }),
@@ -56,10 +57,54 @@ test('negócio e aplicativo compartilham aba, nome e endereço sem repetir o cad
   const modal = page.getByRole('dialog', { name: 'Informações do negócio', exact: true });
   const name = 'Configurações Browser ' + suffix + ' Centro';
   await modal.getByLabel('Nome', { exact: true }).fill(name);
+  await modal
+    .getByLabel('Descrição do negócio', { exact: true })
+    .fill('Comida da casa e bons encontros.');
+  await modal.getByLabel('Telefone', { exact: true }).fill('11988887777');
+  await expect(modal.getByLabel('Telefone', { exact: true })).toHaveValue('(11) 98888-7777');
+  await modal.getByLabel('E-mail de contato', { exact: true }).fill('CONTATO@EXAMPLE.COM');
+  await modal.getByLabel('CEP', { exact: true }).fill('abc00123456');
+  await expect(modal.getByLabel('CEP', { exact: true })).toHaveValue('00123-456');
+  await modal.getByLabel('Rua ou avenida', { exact: true }).fill('Rua das Flores');
+  await modal.getByLabel('Número', { exact: true }).fill('S/N');
+  await modal.getByLabel('Complemento', { exact: true }).fill('Loja 2');
+  await modal.getByLabel('Bairro', { exact: true }).fill('Centro');
+  await modal.getByLabel('Cidade', { exact: true }).fill('São Paulo');
+  await modal.getByRole('combobox', { name: 'Estado (UF)', exact: true }).click();
+  await page.getByRole('option', { name: 'São Paulo (SP)', exact: true }).click();
   await modal.getByRole('button', { name: 'Salvar', exact: true }).click();
   await expect(modal).toHaveCount(0);
   const saved = await savedSettings(request);
   fixture.slug = saved.slug;
+  expect(saved.business_profile).toMatchObject({
+    description: 'Comida da casa e bons encontros.',
+    phone: '11988887777',
+    email: 'contato@example.com',
+    postal_code: '00123456',
+    street: 'Rua das Flores',
+    number: 'S/N',
+    city: 'São Paulo',
+    state: 'SP',
+  });
+  await expect(page.locator('.business-settings-details')).toContainText(
+    'Comida da casa e bons encontros.',
+  );
+  const customer = await page.context().newPage();
+  await customer.goto('http://127.0.0.1:35174/' + saved.slug + '/');
+  await customer.getByRole('button', { name: 'Sobre o estabelecimento', exact: true }).click();
+  const about = customer.getByRole('dialog', { name: 'Sobre ' + name, exact: true });
+  await expect(about).toContainText('Comida da casa e bons encontros.');
+  await expect(about).toContainText('Rua das Flores, S/N');
+  await expect(about.getByRole('link', { name: '(11) 98888-7777', exact: true })).toHaveAttribute(
+    'href',
+    'tel:+5511988887777',
+  );
+  await expect(
+    about.getByRole('link', { name: 'contato@example.com', exact: true }),
+  ).toHaveAttribute('href', 'mailto:contato@example.com');
+  await customer.setViewportSize({ width: 320, height: 844 });
+  expect(await about.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+  await customer.close();
   await expect(page.locator('.pwa-phone-preview')).toContainText(name);
   await expect(page.getByLabel('Endereço gerado automaticamente', { exact: true })).toHaveValue(
     saved.slug,
@@ -67,16 +112,66 @@ test('negócio e aplicativo compartilham aba, nome e endereço sem repetir o cad
   await expect(page.getByLabel('URL pública', { exact: true })).toHaveValue(
     'http://127.0.0.1:35174/' + saved.slug + '/',
   );
-  for (const width of [1366, 390, 320]) {
-    await page.setViewportSize({ width, height: 900 });
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
-      true,
-    );
+  for (const theme of ['light', 'dark']) {
+    await page.evaluate((theme) => (document.documentElement.dataset.theme = theme), theme);
+    for (const width of [1440, 390, 320]) {
+      await page.setViewportSize({ width, height: 1000 });
+      await expect(page.locator('.admin-main')).toHaveCSS(
+        'margin-left',
+        width > 900 ? '284px' : '0px',
+      );
+      await expect(page.locator('.sidebar')).toHaveCSS(
+        'transform',
+        width > 900 ? 'none' : 'matrix(1, 0, 0, 1, -284, 0)',
+      );
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+        true,
+      );
+      await page.evaluate(() => window.scrollTo({ left: 0, top: 0, behavior: 'instant' }));
+      if (width !== 320)
+        await page.screenshot({
+          path: '.local/screenshots/settings-business-' + width + '-' + theme + '.png',
+          fullPage: true,
+        });
+    }
   }
-  await page.screenshot({
-    path: '.local/screenshots/settings-business-mobile.png',
-    fullPage: true,
-  });
+});
+test('protege alterações só no perfil e valida telefone e CEP antes de salvar', async ({
+  page,
+  request,
+}) => {
+  const before = (await savedSettings(request)).business_profile;
+  await login(page);
+  await page.getByRole('button', { name: 'Editar endereço', exact: true }).click();
+  const modal = page.getByRole('dialog', { name: 'Informações do negócio', exact: true });
+  await modal.getByLabel('Cidade', { exact: true }).fill('Cidade ainda não salva');
+  await modal.getByRole('button', { name: 'Cancelar', exact: true }).click();
+  const guard = page.getByRole('alertdialog', { name: 'Descartar alterações?', exact: true });
+  await expect(guard).toBeVisible();
+  await guard.getByRole('button', { name: 'Continuar editando', exact: true }).click();
+  await expect(modal.getByLabel('Cidade', { exact: true })).toHaveValue('Cidade ainda não salva');
+  await modal.getByLabel('Telefone', { exact: true }).fill('123');
+  await modal.getByRole('button', { name: 'Salvar', exact: true }).click();
+  await expect(
+    modal.getByText('Informe o telefone com DDD (10 ou 11 dígitos).', { exact: true }),
+  ).toBeVisible();
+  await modal.getByLabel('Telefone', { exact: true }).fill('11988887777');
+  await modal.getByLabel('CEP', { exact: true }).fill('123');
+  await modal.getByRole('button', { name: 'Salvar', exact: true }).click();
+  await expect(modal.getByText('Informe um CEP com 8 dígitos.', { exact: true })).toBeVisible();
+  for (const theme of ['light', 'dark']) {
+    await page.evaluate((theme) => (document.documentElement.dataset.theme = theme), theme);
+    for (const width of [1440, 390, 320]) {
+      await page.setViewportSize({ width, height: 900 });
+      expect(await modal.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(
+        true,
+      );
+    }
+  }
+  expect((await savedSettings(request)).business_profile).toEqual(before);
+  await modal.getByRole('button', { name: 'Cancelar', exact: true }).click();
+  await guard.getByRole('button', { name: 'Descartar alterações', exact: true }).click();
+  await expect(modal).toHaveCount(0);
 });
 test('aplica períodos a dias escolhidos, preserva os demais e permite 24 horas e dias fechados', async ({
   page,

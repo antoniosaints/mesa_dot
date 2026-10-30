@@ -149,7 +149,7 @@ export function WaiterApp() {
           }
         />
         <ClientRequestBanner tables={tables} onOpen={() => setPage('calls')} />
-        <div className="customer-nav">
+        <div className="customer-nav system-tabs">
           <button
             className={page === 'tables' ? 'active' : ''}
             onClick={() => {

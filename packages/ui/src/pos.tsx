@@ -1,4 +1,5 @@
 import { TableQrButton } from './table-qr-print.js';
+import { ProductPhotoImage } from './product-photo.js';
 import {
   StockHint,
   productHasStock,
@@ -88,7 +89,13 @@ export function ProductPicker({
             variant_id: variant || undefined,
             modifiers,
             notes,
-            name: product.name + (selected ? ' · ' + selected.name : ''),
+            name:
+              product.name +
+              (selected
+                ? ' · ' + selected.name
+                : product.default_variant_name && product.default_variant_name !== 'Padrão'
+                  ? ' · ' + product.default_variant_name
+                  : ''),
             price,
           });
         }}
@@ -96,6 +103,11 @@ export function ProductPicker({
         <p className="muted">
           {product.description || 'Confira as opções antes de adicionar ao pedido.'}
         </p>
+        {product.default_variant_name &&
+          product.default_variant_name !== 'Padrão' &&
+          !catalog.variants.some((item: Data) => item.product_id === product.id) && (
+            <p className="field-hint">Variação: {product.default_variant_name}</p>
+          )}
         {catalog.variants.some((item: Data) => item.product_id === product.id) && (
           <label>
             Variação
@@ -107,7 +119,7 @@ export function ProductPicker({
               options={[
                 {
                   id: '',
-                  name: 'Padrão · ' + brl(product.price),
+                  name: (product.default_variant_name ?? 'Padrão') + ' · ' + brl(product.price),
                   disabled: remainingStock(catalog, cart, product.id) < 1,
                 },
                 ...catalog.variants
@@ -565,7 +577,7 @@ export function TablePanel({
         </span>
       </button>
       <div
-        className="table-mobile-navigation"
+        className="table-mobile-navigation system-tabs"
         role="tablist"
         aria-label="Seções da gestão"
         onKeyDown={(event) => {
@@ -693,7 +705,7 @@ export function TablePanel({
                     }}
                   >
                     <span className="catalog-product-symbol">
-                      <Icon name={item.requires_production ? 'production' : 'menu'} size={23} />
+                      <ProductPhotoImage product={item} decorative />
                     </span>
                     <span className="catalog-product-name">{item.name}</span>
                     <StockHint catalog={catalog} cart={cart} productId={item.id} allowVariants />
@@ -730,7 +742,7 @@ export function TablePanel({
           <div className="attendance-navigation">
             <div
               ref={attendanceNav}
-              className="attendance-tabs"
+              className="attendance-tabs system-tabs"
               role="tablist"
               aria-label="Atendimento da mesa"
             >

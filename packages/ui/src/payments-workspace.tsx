@@ -272,13 +272,19 @@ export function PaymentsWorkspace({ can }: { can: (permission: string) => boolea
             {loading ? 'Atualizando…' : 'Atualização automática'}
           </span>
         </div>
-        <div className="payments-group-tabs" role="tablist" aria-label="Grupos de pagamentos">
-          {[
-            ['all', 'Todos'],
-            ['received', 'Recebidos'],
-            ['refunded', 'Com estorno'],
-            ['review', 'A conciliar'],
-          ].map(([id, label]) => (
+        <div
+          className="payments-group-tabs system-tabs"
+          role="tablist"
+          aria-label="Grupos de pagamentos"
+        >
+          {(
+            [
+              ['all', 'Todos', 'payments'],
+              ['received', 'Recebidos', 'check'],
+              ['refunded', 'Com estorno', 'back'],
+              ['review', 'A conciliar', 'clock'],
+            ] as const
+          ).map(([id, label, icon]) => (
             <button
               key={id}
               id={'payment-tab-' + id}
@@ -308,6 +314,7 @@ export function PaymentsWorkspace({ can }: { can: (permission: string) => boolea
               }}
               onClick={() => update({ group: id })}
             >
+              <Icon name={icon} size={16} />
               {label}
               <span>{records ? groupCount(id) : '—'}</span>
             </button>

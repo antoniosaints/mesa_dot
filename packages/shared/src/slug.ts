@@ -36,6 +36,7 @@ export const reservedSlugs = new Set([
   'impressao',
   'equipe',
   'configuracoes',
+  'complementos',
   'minhas-fichas',
   'consumo',
   'entregas',

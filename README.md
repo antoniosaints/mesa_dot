@@ -74,6 +74,12 @@ O seletor no topo do menu lateral permite criar e trocar filiais. Em **Equipe �
 
 Após o login, use **F1** para ler fichas, **F2** para mesas, **F3** para cardápio e **F4** para buscar funções. A barra fixa no rodapé mostra os atalhos com cores diferentes e permite acioná-los pelo mouse ou toque. Veja [o funcionamento e as regras de navegação](docs/atalhos-gestao.md).
 
+## Complementos
+
+O admin geral encontra **Complementos** no menu da gestão: um catálogo para instalar e configurar **Mercado Pago por OAuth** (checkout e estornos online na conta da filial) e **Gemini por API** (ajuda e resumos com indicadores agregados). Conexões são criptografadas e separadas por filial. A aplicação OAuth exige configuração de ambiente da plataforma; a chave Gemini é cadastrada pelo admin no modal. Veja [configuração, homologação e cuidados operacionais](docs/complementos.md).
+
+O **Assistente IA** fica em um balão flutuante na gestão, com conversa por filial, atalhos para resumos e geração de textos. Há ações de descrição nos formulários de produtos e do negócio, além de prévia e download de imagens com modelos compatíveis. Sugestões precisam ser revisadas e aplicadas antes do salvamento normal do cadastro. Veja [chat e ações rápidas de IA](docs/assistente-ia.md).
+
 ## Estrutura
 
 ```text
@@ -413,7 +419,7 @@ Este computador não dispõe de Docker Engine nem de uma VM/EasyPanel de destino
 
 Para impressoras instaladas no computador, use **Impressão → PrintBridge**: conecte e autorize a origem no aplicativo oficial, vincule os dispositivos e ative a fila. Fichas e cupons podem ser enviados em PDF pelo driver ou ESC/POS. Mantenha a aba aberta para receber novos trabalhos. Consulte [configuração do PrintBridge](docs/printbridge.md).
 
-Como alternativa para térmicas de rede, cadastre uma impressora e seu setor na administração. Crie uma credencial de agente, exibida uma única vez. Configure `PRINT_AGENT_TOKEN`, `PRINT_API_URL`, `PRINT_PRINTER_ID` (ID devolvido por `/printers`), `PRINT_HOST` e `PRINT_PORT` no ambiente local e execute `pnpm start:print` após o build, ou `pnpm --filter @bar/print-agent start` para o código fonte. O agente suporta impressora térmica de rede via TCP/ESC/POS. Para vários dispositivos, `PRINT_PRINTERS_JSON` mapeia cada ID para seu host/porta locais. O agente reivindica somente jobs das impressoras mapeadas. A credencial fica restrita à unidade. Segunda via e retry conservam a ficha e o token; não criam outro direito de consumo. Impressoras USB instaladas no sistema podem ser utilizadas pelo PrintBridge.
+Como alternativa para térmicas de rede, cadastre uma impressora e seu setor na administração. Em **Impressão → PrintBridge → Impressão TCP/IP**, crie uma credencial de agente, exibida uma única vez. O PrintBridge não exige essa criação manual: o computador é cadastrado ao ativar a fila local. Configure `PRINT_AGENT_TOKEN`, `PRINT_API_URL`, `PRINT_PRINTER_ID` (ID devolvido por `/printers`), `PRINT_HOST` e `PRINT_PORT` no ambiente local e execute `pnpm start:print` após o build, ou `pnpm --filter @bar/print-agent start` para o código fonte. O agente suporta impressora térmica de rede via TCP/ESC/POS. Para vários dispositivos, `PRINT_PRINTERS_JSON` mapeia cada ID para seu host/porta locais. O agente reivindica somente jobs das impressoras mapeadas. A credencial fica restrita à unidade. Segunda via e retry conservam a ficha e o token; não criam outro direito de consumo. Impressoras USB instaladas no sistema podem ser utilizadas pelo PrintBridge.
 
 ## Documentação
 

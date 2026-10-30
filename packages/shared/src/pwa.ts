@@ -47,7 +47,7 @@ const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const routes: Record<PwaSurface, RegExp> = {
   customer: /^(?:|cardapio|consumo|minhas-fichas)\/?$/,
   admin:
-    /^(?:|dashboard|salao(?:\/atendimento\/[a-f0-9-]{36})?|pedidos(?:\/[a-f0-9-]{36}(?:\/fichas\/[a-f0-9-]{36})?)?|producao|cardapio|pagamentos|caixa|financeiro|estoque|impressao|estacao-impressao|equipe|configuracoes)\/?$/,
+    /^(?:|dashboard|salao(?:\/atendimento\/[a-f0-9-]{36})?|pedidos(?:\/[a-f0-9-]{36}(?:\/fichas\/[a-f0-9-]{36})?)?|producao|cardapio|pagamentos|caixa|financeiro|estoque|impressao|estacao-impressao|equipe|configuracoes|complementos)\/?$/,
   waiter: /^(?:|mesas(?:\/[a-f0-9-]{36})?|entregas|chamados|conferir-ficha)\/?$/,
 
   kitchen: /^(?:|producao)\/?$/,
@@ -84,6 +84,12 @@ export function safePwaSearch(params: URLSearchParams, surface: PwaSurface) {
   if (table && uuid.test(table)) result.set('table', table);
   const tab = params.get('aba');
   if (surface !== 'customer' && tab && /^[a-z0-9-]{1,60}$/.test(tab)) result.set('aba', tab);
+  const paymentReturn = params.get('payment_return');
+  if (surface === 'customer' && paymentReturn && uuid.test(paymentReturn))
+    result.set('payment_return', paymentReturn);
+  const oauth = params.get('oauth');
+  if (surface === 'admin' && oauth && ['success', 'denied', 'error'].includes(oauth))
+    result.set('oauth', oauth);
   return result.toString();
 }
 const html = (value: string) =>

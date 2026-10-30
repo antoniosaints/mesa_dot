@@ -33,6 +33,11 @@ const env = z
       .regex(/^[a-f0-9]{64}$/i)
       .optional(),
     PAYMENT_WEBHOOK_SECRET: z.string().min(32).optional(),
+    MERCADO_PAGO_CLIENT_ID: z.string().regex(/^\d+$/).optional(),
+    MERCADO_PAGO_CLIENT_SECRET: z.string().min(16).optional(),
+    MERCADO_PAGO_REDIRECT_URI: z.string().url().optional(),
+    MERCADO_PAGO_WEBHOOK_SECRET: z.string().min(16).optional(),
+    MERCADO_PAGO_TEST_MODE: z.enum(['true', 'false']).default('false'),
   })
   .parse(Object.fromEntries(Object.entries(process.env).filter(([, v]) => v !== '')));
 export { env };

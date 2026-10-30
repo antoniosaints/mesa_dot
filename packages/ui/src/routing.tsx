@@ -23,6 +23,7 @@ export const adminPaths: Record<string, string> = {
   printing: '/impressao',
   team: '/equipe',
   settings: '/configuracoes',
+  complements: '/complementos',
 };
 export function usePageRoute(
   paths: Record<string, string>,

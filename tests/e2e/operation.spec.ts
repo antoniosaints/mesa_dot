@@ -320,6 +320,16 @@ test('abas, busca em selects e toasts preservam os formulários', async ({ page 
     'aria-selected',
     'true',
   );
+  for (const [section, label] of [
+    ['Cardápio', 'Cardápio'],
+    ['Impressão', 'Impressão'],
+    ['Configurações', 'Configurações'],
+    ['Salão e mesas', 'Salão'],
+  ]) {
+    await page.getByRole('button', { name: section, exact: true }).click();
+    await expect(page.getByRole('tablist', { name: label, exact: true })).toBeVisible();
+    await page.screenshot({ path: `.local/screenshots/tabs-${section.replace(/\W/g, '-')}.png` });
+  }
 });
 
 test('arrastar a seleção de um campo para fora não fecha o modal', async ({ page }) => {
@@ -1148,6 +1158,7 @@ test('gestão da mesa mantém fluxos no layout de três painéis e no celular', 
   await expect(summary.locator('.attendance-money')).toContainText('R$ 87,00');
   await expect(summary.locator('.attendance-money')).toContainText('R$ 67,00');
   await expect(operation.getByText('Sem açúcar', { exact: true })).toBeVisible();
+  await expect(dialog.locator('.table-mobile-navigation')).toBeHidden();
   await page.screenshot({ path: 'docs/screenshots/mesa-design-system-desktop.png' });
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(operation).toBeVisible();
@@ -1827,6 +1838,16 @@ test('produto centraliza variações, locais, saldos, movimentos, ficha e adicio
     product.getByRole('combobox', { name: 'Filtrar movimentações por estoque' }),
   ).toHaveValue(new RegExp(place));
   await expect(product.getByText('Compra', { exact: true })).toBeVisible();
+  await product
+    .getByRole('searchbox', { name: 'Buscar movimentação do produto' })
+    .fill('movimento inexistente');
+  await expect(
+    product.getByText('Nenhuma movimentação encontrada.', { exact: true }),
+  ).toBeVisible();
+  await product.getByRole('button', { name: 'Limpar filtros', exact: true }).click();
+  await expect(
+    product.getByRole('combobox', { name: 'Filtrar movimentações por estoque' }),
+  ).toHaveValue('Todos os estoques');
   await product.getByRole('tab', { name: 'Ficha técnica', exact: true }).click();
   await product.getByRole('button', { name: 'Criar ficha técnica', exact: true }).click();
   const recipe = page.getByRole('dialog', { name: 'Criar ficha técnica', exact: true });
@@ -1837,7 +1858,7 @@ test('produto centraliza variações, locais, saldos, movimentos, ficha e adicio
   await page.getByRole('option', { name: 'Cachaça (ingrediente)', exact: true }).click();
   await ingredient.getByLabel('Quantidade por unidade').fill('0,050');
   await ingredient.getByRole('button', { name: 'Salvar', exact: true }).click();
-  await expect(product.getByText('0,050 por unidade')).toBeVisible();
+  await expect(product.getByText('0,050 un por unidade vendida')).toBeVisible();
   await product.getByRole('tab', { name: 'Adicionais', exact: true }).click();
   await product.getByRole('button', { name: 'Gerenciar grupos e adicionais', exact: true }).click();
   const groups = page.getByRole('dialog', { name: 'Grupos e adicionais', exact: true });
@@ -1869,6 +1890,57 @@ test('produto centraliza variações, locais, saldos, movimentos, ficha e adicio
   expect(info.variants[0].stock_mode).toBe('OWN');
   expect(info.recipe_items[0].quantity).toBe('0.050');
   expect(info.links).toHaveLength(1);
+  await product.getByRole('tab', { name: 'Geral', exact: true }).click();
+  await product
+    .getByLabel('Descrição', { exact: true })
+    .fill('Descrição temporária para revisar a prévia.');
+  await expect(product.locator('.product-context-card')).toContainText('Descrição temporária');
+  await product.getByRole('tab', { name: 'Estoque e produção', exact: true }).click();
+  await product
+    .getByRole('combobox', { name: 'Baixa de estoque', exact: true })
+    .fill('Na produção');
+  await page.getByRole('option', { name: 'Na produção', exact: true }).click();
+  await expect(product.locator('.product-overview')).toContainText('Produção · bar');
+  await expect(
+    product.getByText(
+      'A baixa Na produção exige preparo, mesmo com a opção Exige produção desligada.',
+    ),
+  ).toBeVisible();
+  await product.getByRole('combobox', { name: 'Baixa de estoque', exact: true }).fill('Na entrega');
+  await page.getByRole('option', { name: 'Na entrega', exact: true }).click();
+  await product.getByRole('tab', { name: 'Geral', exact: true }).click();
+  await product.getByRole('button', { name: 'Configurar preços', exact: true }).click();
+  await expect(
+    product.getByRole('tab', { name: 'Preços e variações', exact: true }),
+  ).toHaveAttribute('aria-selected', 'true');
+  await product.getByRole('searchbox', { name: 'Buscar variação' }).fill('inexistente');
+  await expect(product.getByText('Nenhuma variação corresponde à busca.')).toBeVisible();
+  await product.getByRole('searchbox', { name: 'Buscar variação' }).fill('Grande');
+  await expect(product.getByRole('button', { name: 'Editar variação Grande' })).toBeVisible();
+  await product.getByRole('searchbox', { name: 'Buscar variação' }).fill('');
+  const productTabs = [
+    'Geral',
+    'Preços e variações',
+    'Estoque e produção',
+    'Estoques e locais',
+    'Movimentações',
+    'Ficha técnica',
+    'Adicionais',
+  ];
+  for (const [index, tab] of productTabs.entries()) {
+    await product.getByRole('tab', { name: tab, exact: true }).click();
+    await expect(product.getByRole('tabpanel', { name: tab, exact: true })).toBeVisible();
+    expect(await product.evaluate((node) => node.scrollWidth <= node.clientWidth + 1)).toBe(true);
+    await page.screenshot({ path: `.local/screenshots/produto-aba-${index}-desktop.png` });
+  }
+  await product.getByRole('button', { name: 'Cancelar', exact: true }).click();
+  await expect(page.getByRole('alertdialog', { name: 'Descartar alterações?' })).toBeVisible();
+  await page.getByRole('button', { name: 'Continuar editando', exact: true }).click();
+  await product.getByRole('tab', { name: 'Geral', exact: true }).click();
+  await expect(product.getByLabel('Descrição', { exact: true })).toHaveValue(
+    'Descrição temporária para revisar a prévia.',
+  );
+  await product.getByLabel('Descrição', { exact: true }).fill(info.product.description ?? '');
   await product.getByRole('button', { name: 'Cancelar', exact: true }).click();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole('button', { name: 'Abrir menu', exact: true }).click();
@@ -1884,6 +1956,29 @@ test('produto centraliza variações, locais, saldos, movimentos, ficha e adicio
   ).toHaveAttribute('aria-selected', 'true');
   expect(await product.evaluate((node) => node.scrollWidth <= node.clientWidth + 1)).toBe(true);
   await page.screenshot({ path: 'docs/screenshots/produto-gestao-mobile.png' });
+  for (const [index, tab] of productTabs.entries()) {
+    await product.getByRole('tab', { name: tab, exact: true }).click();
+    await expect(product.getByRole('tabpanel', { name: tab, exact: true })).toBeVisible();
+    expect(await product.evaluate((node) => node.scrollWidth <= node.clientWidth + 1)).toBe(true);
+    await page.screenshot({ path: `.local/screenshots/produto-aba-${index}-mobile.png` });
+  }
+  await product.getByRole('button', { name: 'Cancelar', exact: true }).click();
+  await page.getByRole('button', { name: 'Ativar tema escuro', exact: true }).click();
+  await page
+    .getByRole('row')
+    .filter({ hasText: 'Grande' })
+    .getByRole('button', { name: 'Gerenciar produto', exact: true })
+    .click();
+  for (const tab of productTabs) {
+    await product.getByRole('tab', { name: tab, exact: true }).click();
+    expect(await product.evaluate((node) => node.scrollWidth <= node.clientWidth + 1)).toBe(true);
+  }
+  await page.screenshot({ path: '.local/screenshots/produto-mobile-dark.png' });
+  await page.setViewportSize({ width: 320, height: 844 });
+  for (const tab of productTabs) {
+    await product.getByRole('tab', { name: tab, exact: true }).click();
+    expect(await product.evaluate((node) => node.scrollWidth <= node.clientWidth + 1)).toBe(true);
+  }
 });
 
 test('gestor só de catálogo edita preço sem alterar a origem de estoque da variação', async ({
@@ -5817,4 +5912,83 @@ test('switch do cabeçalho pausa pedidos, abre caixa no mesmo modal e alerta par
   await expect(page.getByRole('dialog', { name: 'Ativar novos pedidos', exact: true })).toHaveCount(
     0,
   );
+});
+
+test('unidades de medida mantêm padrão, saldos, histórico e orientação da ficha técnica', async ({
+  page,
+  request,
+}) => {
+  test.setTimeout(120000);
+  const suffix = randomUUID().slice(0, 6),
+    name = 'Ingrediente em medida ' + suffix;
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await login(page, 35173);
+  await page.getByRole('button', { name: 'Cardápio', exact: true }).click();
+  await page.getByRole('button', { name: 'Novo produto', exact: true }).click();
+  let editor = page.getByRole('dialog', { name: 'Adicionar · Produtos', exact: true });
+  const measure = () => editor.getByRole('combobox', { name: 'Unidade de medida', exact: true });
+  await expect(measure()).toHaveValue('Unidade (un)');
+  await editor.getByLabel('Nome', { exact: true }).fill(name);
+  await measure().fill('quilograma');
+  await page.getByRole('option', { name: 'Quilograma (kg)', exact: true }).click();
+  await editor.getByRole('tab', { name: 'Preços e variações', exact: true }).click();
+  await editor.getByLabel('Preço', { exact: true }).fill('4,50');
+  await editor.getByRole('tab', { name: 'Estoque e produção', exact: true }).click();
+  await editor.getByRole('combobox', { name: 'Baixa de estoque', exact: true }).fill('Na entrega');
+  await page.getByRole('option', { name: 'Na entrega', exact: true }).click();
+  await editor.getByRole('button', { name: 'Salvar e continuar', exact: true }).click();
+  const initial = page.getByRole('dialog', { name: 'Criar estoque do novo produto?', exact: true });
+  await expect(initial).toContainText('Informe em kg');
+  await initial.getByLabel('Quantidade inicial', { exact: true }).fill('2,500');
+  await initial.getByRole('button', { name: 'Criar estoque', exact: true }).click();
+  editor = page.getByRole('dialog', { name: 'Editar · Produtos', exact: true });
+  await expect(editor.getByRole('cell', { name: '2,500 kg', exact: true }).first()).toBeVisible();
+  await editor.getByRole('tab', { name: 'Geral', exact: true }).click();
+  await expect(measure()).toHaveValue('Quilograma (kg)');
+  await measure().fill('grama');
+  await page.getByRole('option', { name: 'Grama (g)', exact: true }).click();
+  await expect(editor).toContainText('Alterar a unidade não converte saldos');
+  await editor.getByRole('button', { name: 'Cancelar', exact: true }).click();
+  await expect(page.getByRole('alertdialog', { name: 'Descartar alterações?' })).toBeVisible();
+  await page.getByRole('button', { name: 'Continuar editando', exact: true }).click();
+  await editor.getByRole('button', { name: 'Salvar e continuar', exact: true }).click();
+  await editor.getByRole('tab', { name: 'Estoques e locais', exact: true }).click();
+  await expect(editor.getByRole('cell', { name: '2,500 g', exact: true }).first()).toBeVisible();
+  await editor.getByRole('tab', { name: 'Movimentações', exact: true }).click();
+  await expect(editor.getByRole('cell', { name: '+2,500 kg', exact: true })).toBeVisible();
+  await page.screenshot({ path: '.local/screenshots/unidade-produto-historico.png' });
+  await editor.getByRole('button', { name: 'Cancelar', exact: true }).click();
+  const ingredient = (await staffApi(request, '/products')).find(
+    (product: any) => product.name === name,
+  );
+  expect(ingredient.unit_code).toBe('G');
+  const dish = await staffApi(request, '/products', {
+    name: 'Receita de medida ' + suffix,
+    price: '10.00',
+    stock_policy: 'RECIPE',
+  });
+  expect(dish.unit_code).toBe('UN');
+  await staffApi(request, '/recipes', { product_id: dish.id });
+  await page.getByRole('button', { name: 'Recarregar Produtos', exact: true }).click();
+  await page.getByRole('searchbox', { name: 'Buscar em Produtos' }).fill(dish.name);
+  await page.getByRole('button', { name: 'Editar ' + dish.name, exact: true }).click();
+  await editor.getByRole('tab', { name: 'Ficha técnica', exact: true }).click();
+  await editor.getByRole('button', { name: 'Adicionar ingrediente', exact: true }).click();
+  const recipe = page.getByRole('dialog', { name: 'Adicionar ingrediente', exact: true });
+  await recipe.getByRole('combobox', { name: 'Ingrediente', exact: true }).fill(name);
+  await page.getByRole('option', { name, exact: true }).click();
+  await expect(recipe).toContainText('Informe em g.');
+  await recipe.getByLabel('Quantidade por unidade', { exact: true }).fill('0,500');
+  await recipe.getByRole('button', { name: 'Salvar', exact: true }).click();
+  await expect(editor.getByText('0,500 g por unidade vendida', { exact: true })).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await editor.getByRole('tab', { name: 'Geral', exact: true }).click();
+  await measure().fill('litro');
+  await page.getByRole('option', { name: 'Litro (L)', exact: true }).click();
+  expect(await editor.evaluate((node) => node.scrollWidth <= node.clientWidth + 1)).toBe(true);
+  await measure().scrollIntoViewIfNeeded();
+  await page.screenshot({ path: '.local/screenshots/unidade-produto-mobile.png' });
+  expect(
+    (await staffApi(request, '/products')).find((product: any) => product.id === dish.id).unit_code,
+  ).toBe('UN');
 });

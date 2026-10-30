@@ -135,6 +135,9 @@ Toda listagem administrativa deve considerar:
 - Ícones e miniaturas quando úteis.
 - Badges para status.
 - Botões de ação compactos.
+- Última coluna alinhada à direita, incluindo cabeçalho, valores e grupos de ações,
+  respeitando o espaçamento interno da tabela. Estados vazios e de loading com
+  células mescladas mantêm seu próprio alinhamento.
 - Menu contextual com ações secundárias.
 - Paginação no rodapé.
 - Seletor de quantidade de registros.
@@ -313,6 +316,12 @@ components/
 ```
 
 Não duplicar layouts e estilos entre módulos.
+
+### Padrão das abas
+
+As abas devem seguir o modal de gestão do produto: ícone Lucide junto ao texto, fundo suave e linha inferior de 2px na cor principal para a opção ativa, sem formato de pílula. Mantenha os contadores compactos, foco visível, navegação por teclado e adaptação ao tema claro ou escuro. Quando não houver espaço, permita rolagem dentro da barra, sem gerar rolagem horizontal na página.
+
+Neste projeto, use os componentes `Tabs` e `Tab` de `packages/ui/src/controls.tsx`, informando um `icon` para cada aba. Navegações especializadas utilizam a classe compartilhada `system-tabs`, definida em `packages/ui/src/styles.css`. Estilos locais devem ajustar apenas o layout; cores, bordas e estados das abas são centralizados. A navegação inferior do cliente mantém sua posição e organização para toque no celular.
 
 ## 16. PADRÃO DE PÁGINAS
 

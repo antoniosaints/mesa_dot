@@ -1,4 +1,6 @@
 export const scopedTables = [
+  'unit_complements',
+  'complement_oauth_states',
   'order_item_assignments',
   'order_item_transfers',
   'roles',

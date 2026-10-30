@@ -368,9 +368,20 @@ function ProductPreview() {
             <span /> Em operação
           </span>
         </div>
-        <div className="mesa-preview-tabs" role="tablist" aria-label="Conheça a operação">
+        <div
+          className="mesa-preview-tabs system-tabs"
+          role="tablist"
+          aria-label="Conheça a operação"
+        >
           {['Salão', 'Cozinha', 'Caixa'].map((t) => (
             <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)}>
+              {t === 'Salão' ? (
+                <LayoutDashboard size={16} aria-hidden="true" />
+              ) : t === 'Cozinha' ? (
+                <ChefHat size={16} aria-hidden="true" />
+              ) : (
+                <CreditCard size={16} aria-hidden="true" />
+              )}
               {t}
             </button>
           ))}

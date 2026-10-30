@@ -265,3 +265,98 @@ test('um dispositivo sem configuração não tenta conectar o PrintBridge nem ga
   expect(sockets).toBe(0);
   await expect(page.getByLabel('E-mail', { exact: true })).toHaveCount(0);
 });
+test('a gestão prioriza PrintBridge e mantém TCP como opção avançada com credencial única e revogação', async ({
+  page,
+  request,
+}) => {
+  await login(page);
+  const tabs = page.getByRole('tablist', { name: 'Impressão', exact: true });
+  await expect(tabs.getByRole('tab')).toHaveCount(3);
+  await expect(tabs.getByRole('tab', { name: 'Agentes', exact: true })).toHaveCount(0);
+  const advanced = page.locator('.tcp-agent-settings');
+  await expect(advanced).not.toHaveAttribute('open', '');
+  await advanced.locator('summary').click();
+  await expect(advanced).toHaveAttribute('open', '');
+  await expect(advanced).toContainText('Usa PrintBridge? Não precisa criar uma credencial aqui.');
+  await advanced.getByRole('button', { name: 'Criar agente TCP/IP', exact: true }).click();
+  const create = page.getByRole('dialog', { name: 'Criar agente TCP/IP', exact: true });
+  await create.getByLabel('Nome do agente TCP/IP', { exact: true }).fill('Servidor TCP browser');
+  await create.getByRole('button', { name: 'Criar credencial TCP/IP', exact: true }).click();
+  const credential = page.getByRole('dialog', { name: 'Credencial do agente TCP/IP', exact: true });
+  await expect(credential).toBeVisible();
+  const raw = await credential.getByLabel('Credencial do agente', { exact: true }).inputValue();
+  expect(raw).toHaveLength(43);
+  const config = await credential
+    .getByLabel('Configuração do agente', { exact: true })
+    .inputValue();
+  expect(config).toContain('PRINT_AGENT_TOKEN=' + raw);
+  expect(config).toContain('PRINT_API_URL=http://127.0.0.1:35173/api/v1');
+  await credential
+    .getByRole('combobox', { name: 'Impressora para a configuração', exact: true })
+    .click();
+  await page.getByRole('option', { name: printer.name + ' · remote', exact: true }).click();
+  await expect(credential.getByLabel('Configuração do agente', { exact: true })).toContainText(
+    'PRINT_PRINTER_ID=' + printer.id,
+  );
+  for (const theme of ['light', 'dark']) {
+    await page.evaluate((theme) => (document.documentElement.dataset.theme = theme), theme);
+    for (const width of [1440, 390, 320]) {
+      await page.setViewportSize({ width, height: 900 });
+      expect(
+        await credential.evaluate((element) => element.scrollWidth <= element.clientWidth),
+      ).toBe(true);
+    }
+  }
+  await credential.getByRole('button', { name: 'Fechar credencial', exact: true }).click();
+  const row = advanced.locator('.print-station-row').filter({ hasText: 'Servidor TCP browser' });
+  await expect(row).toContainText('Aguardando conexão');
+  const computers = page.getByRole('region', { name: 'Computadores de impressão', exact: true });
+  await expect(computers).not.toContainText('Servidor TCP browser');
+  await row.getByRole('button', { name: 'Desativar agente', exact: true }).click();
+  const deactivate = page.getByRole('dialog', {
+    name: 'Desativar agente de impressão?',
+    exact: true,
+  });
+  await deactivate.getByRole('button', { name: 'Confirmar', exact: true }).click();
+  await expect(row).toContainText('Desativado');
+  await row.getByRole('button', { name: 'Reativar agente', exact: true }).click();
+  await page
+    .getByRole('dialog', { name: 'Reativar agente de impressão?', exact: true })
+    .getByRole('button', { name: 'Confirmar', exact: true })
+    .click();
+  await expect(row).toContainText('Aguardando conexão');
+  const exposed = await call(request, '/print/agents');
+  expect(JSON.stringify(exposed)).not.toContain(raw);
+  await page.reload();
+  await expect(
+    page.getByRole('dialog', { name: 'Credencial do agente TCP/IP', exact: true }),
+  ).toHaveCount(0);
+  await page.goto(base + '/' + fixture.slug + '/impressao?aba=agentes');
+  await expect(tabs.getByRole('tab', { name: 'PrintBridge', exact: true })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+  await expect(advanced).toHaveAttribute('open', '');
+  for (const theme of ['light', 'dark']) {
+    await page.evaluate((theme) => (document.documentElement.dataset.theme = theme), theme);
+    for (const width of [1440, 390]) {
+      await page.setViewportSize({ width, height: 1000 });
+      await expect(page.locator('.admin-main')).toHaveCSS(
+        'margin-left',
+        width > 900 ? '284px' : '0px',
+      );
+      await expect(page.locator('.sidebar')).toHaveCSS(
+        'transform',
+        width > 900 ? 'none' : 'matrix(1, 0, 0, 1, -284, 0)',
+      );
+      await page.evaluate(() => window.scrollTo({ left: 0, top: 0, behavior: 'instant' }));
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+        true,
+      );
+      await page.screenshot({
+        path: '.local/screenshots/print-settings-' + width + '-' + theme + '.png',
+        fullPage: true,
+      });
+    }
+  }
+});

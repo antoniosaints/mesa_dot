@@ -1,3 +1,13 @@
+import { registerComplements } from './complements-routes.js';
+import { productPhotoSchema, saveProductPhoto, registerProductPhotos } from './product-photos.js';
+import {
+  measurementUnitCodes,
+  measurementUnits,
+} from '../../../packages/shared/src/measurement-units.js';
+import {
+  businessProfilePatchSchema,
+  readBusinessProfile,
+} from '../../../packages/shared/src/business-profile.js';
 import {
   pushConfiguration,
   ownPushContext,
@@ -59,6 +69,7 @@ import {
   productManagement,
   makeDefaultStockLocation,
   removeCatalogLink,
+  removeProductVariant,
 } from './catalog-management.js';
 import { orderCancellationContext } from './order-cancellation.js';
 import { operationContext, tableRequestCounts } from './operation-context.js';
@@ -175,6 +186,14 @@ export async function buildApp(options: { realtime?: boolean; logger?: boolean }
               'req.body',
               'res.headers.set-cookie',
             ],
+            serializers: {
+              req: (request: Row) => ({
+                method: request.method,
+                url: String(request.url).startsWith('/api/v1/complements/mercadopago/callback')
+                  ? '/api/v1/complements/mercadopago/callback'
+                  : request.url,
+              }),
+            },
           }
         : false,
     bodyLimit: 128 * 1024,
@@ -183,7 +202,7 @@ export async function buildApp(options: { realtime?: boolean; logger?: boolean }
   });
   await app.register(cors, {
     origin: env.CORS_ORIGINS.split(','),
-    methods: ['GET', 'POST', 'PATCH', 'OPTIONS'],
+    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: [
       'Content-Type',
       'Authorization',
@@ -276,7 +295,9 @@ export async function buildApp(options: { realtime?: boolean; logger?: boolean }
   ) {
     app.route({
       method,
-      ...(path === '/settings/pwa' ? { bodyLimit: 2100000 } : {}),
+      ...(['/settings/pwa', '/products', '/products/:id'].includes(path)
+        ? { bodyLimit: 2100000 }
+        : {}),
       url: `/api/v1${path}`,
       schema: {
         tags: [path.split('/')[1]],
@@ -327,6 +348,7 @@ export async function buildApp(options: { realtime?: boolean; logger?: boolean }
     });
   }
   let realtimeReady = () => true;
+  registerComplements(app, { route, actor, key });
   app.get('/health/live', async () => ({ status: 'ok' }));
   app.get('/health/ready', async (_req, reply) => {
     try {
@@ -674,7 +696,7 @@ export async function buildApp(options: { realtime?: boolean; logger?: boolean }
     const [products, categories, variants, groups, modifiers, links] = await Promise.all([
       s.list('products', sql`enabled=TRUE`),
       s.list('categories'),
-      s.list('product_variants', sql`enabled=TRUE`),
+      s.list('product_variants', sql`enabled=TRUE AND deleted_at IS NULL`),
       s.list('modifier_groups'),
       s.list('modifiers', sql`enabled=TRUE`),
       s.list('product_modifiers'),
@@ -707,7 +729,7 @@ export async function buildApp(options: { realtime?: boolean; logger?: boolean }
         await saleStockCatalog(
           s,
           await s.list('products', sql`enabled=TRUE`),
-          await s.list('product_variants', sql`enabled=TRUE`),
+          await s.list('product_variants', sql`enabled=TRUE AND deleted_at IS NULL`),
         ),
         (await unit(s)).show_out_of_stock,
       ).products,
@@ -802,6 +824,12 @@ export async function buildApp(options: { realtime?: boolean; logger?: boolean }
   if (env.NODE_ENV !== 'production')
     route('POST', '/sandbox/pay', null, strict({ intent_id: uuid }), async (s, b) => {
       const intent = await s.get('payment_intents', b.intent_id);
+      ensure(
+        intent.provider === 'sandbox',
+        'FORBIDDEN',
+        'Pagamentos reais só podem ser confirmados pelo provedor.',
+        403,
+      );
       await accessOrder(s, intent.order_id);
       if (s.actor.kind === 'STAFF') permit(s.actor, 'payment.receive');
       return capturePayment(s, {
@@ -815,11 +843,14 @@ export async function buildApp(options: { realtime?: boolean; logger?: boolean }
   route('GET', '/products/:id/management', null, null, async (s, _b, req) =>
     productManagement(s, id(req)),
   );
+  route('GET', '/measurement-units', null, null, async () => measurementUnits);
   route('GET', '/inventory/catalog', 'inventory.view', null, async (s) => ({
     products: (await s.list('products')).map((p) => ({
       id: p.id,
       name: p.name,
+      default_variant_name: p.default_variant_name,
       enabled: p.enabled,
+      unit_code: p.unit_code,
       stock_policy: p.stock_policy,
       stock_location_id: p.stock_location_id,
     })),
@@ -828,11 +859,15 @@ export async function buildApp(options: { realtime?: boolean; logger?: boolean }
       product_id: v.product_id,
       name: v.name,
       stock_mode: v.stock_mode,
+      deleted_at: v.deleted_at,
     })),
     locations: await s.list('stock_locations'),
   }));
   route('POST', '/inventory/locations/:id/default', 'inventory.adjust', null, async (s, _b, req) =>
     makeDefaultStockLocation(s, id(req)),
+  );
+  route('DELETE', '/product-variants/:id', 'catalog.manage', null, async (s, _body, request) =>
+    removeProductVariant(s, id(request)),
   );
   route('DELETE', '/recipe-items/:id', 'catalog.manage', null, async (s, _b, req) =>
     removeCatalogLink(s, 'recipe_items', id(req)),
@@ -923,6 +958,7 @@ export async function buildApp(options: { realtime?: boolean; logger?: boolean }
     return { primary_color: appearance.primary_color, sidebar_color: appearance.sidebar_color };
   });
   await registerPwa(app);
+  registerProductPhotos(app);
   route('GET', '/settings/pwa', 'settings.update', null, async (s) => pwaSettings(s));
   route('PATCH', '/settings/pwa', 'settings.update', pwaSettingsSchema, async (s, b) =>
     updatePwaSettings(s, b),
@@ -956,6 +992,7 @@ export async function buildApp(options: { realtime?: boolean; logger?: boolean }
         .transform((value) => value.toLowerCase())
         .optional(),
       name: z.string().trim().min(1).max(160).optional(),
+      business_profile: businessProfilePatchSchema.optional(),
       payment_mode: z.enum(['MIXED', 'PREPAID_ONLY', 'POSTPAID_ONLY']).optional(),
       is_open: z.boolean().optional(),
       postpaid_limit: amount.optional(),
@@ -976,7 +1013,18 @@ export async function buildApp(options: { realtime?: boolean; logger?: boolean }
     }),
     async (s, b) => {
       const previous = await lockCashUnit(s);
-      const sets = Object.entries(b).map(
+      const patch = {
+        ...b,
+        ...(b.business_profile
+          ? {
+              business_profile: {
+                ...readBusinessProfile(previous.business_profile),
+                ...b.business_profile,
+              },
+            }
+          : {}),
+      };
+      const sets = Object.entries(patch).map(
         ([k, v]) => sql`${sql.identifier(k)}=${typeof v === 'object' ? JSON.stringify(v) : v}`,
       );
       ensure(sets.length, 'BAD_REQUEST', 'Configuração vazia.', 400);
@@ -1235,6 +1283,9 @@ export async function buildApp(options: { realtime?: boolean; logger?: boolean }
       strict({
         category_id: uuid.nullable().optional(),
         name: z.string().min(1).max(160),
+        default_variant_name: z.string().trim().min(1).max(100).optional(),
+        photo_base64: productPhotoSchema,
+        unit_code: z.enum(measurementUnitCodes).optional(),
         description: z.string().max(2000).nullable().optional(),
         price: amount,
         enabled: z.boolean().optional(),
@@ -1258,7 +1309,7 @@ export async function buildApp(options: { realtime?: boolean; logger?: boolean }
         stock_mode: z.enum(['SHARED', 'OWN']).optional(),
         stock_location_id: uuid.nullable().optional(),
         product_id: uuid,
-        name: z.string().min(1).max(100),
+        name: z.string().trim().min(1).max(100),
         price: amount,
         enabled: z.boolean().optional(),
       }),
@@ -1363,15 +1414,28 @@ export async function buildApp(options: { realtime?: boolean; logger?: boolean }
   for (const [path, table, permission, schema] of resources) {
     if (path !== 'tables')
       route('GET', `/${path}`, permission, null, async (s) =>
-        (await s.list(table)).map(sanitizeRow),
+        (
+          await s.list(table, path === 'product-variants' ? sql`deleted_at IS NULL` : undefined)
+        ).map(sanitizeRow),
       );
     route('POST', `/${path}`, permission, schema, async (s, b) => {
-      const data = path === 'tables' ? { ...b, public_code: crypto.randomUUID() } : b;
+      const { photo_base64: photo, ...productData } = b;
+      const data =
+        path === 'tables'
+          ? { ...b, public_code: crypto.randomUUID() }
+          : path === 'products'
+            ? {
+                ...productData,
+                unit_code: b.unit_code ?? 'UN',
+                default_variant_name: b.default_variant_name ?? 'Padrão',
+              }
+            : b;
       await validateCatalogResource(s, path, data);
       const record = await s.insert(table, data);
+      if (path === 'products' && photo !== undefined) await saveProductPhoto(s, record.id, photo);
       await s.audit(`${path}.created`, record.id);
       await s.event(`${path}.updated`, record.id);
-      return record;
+      return path === 'products' ? s.get(table, record.id) : record;
     });
     if (path !== 'stock-balances')
       route('PATCH', `/${path}/:id`, permission, schema.partial(), async (s, b, req) => {
@@ -1379,7 +1443,10 @@ export async function buildApp(options: { realtime?: boolean; logger?: boolean }
         if (path === 'tables') ensure(!current.deleted_at, 'NOT_FOUND', 'Mesa excluída.', 404);
         await validateCatalogResource(s, path, b, current);
         ensure(Object.keys(b).length, 'BAD_REQUEST', 'Alteração vazia.', 400);
-        await s.update(table, id(req), b);
+        const { photo_base64: photo, ...productData } = b;
+        const data = path === 'products' ? productData : b;
+        if (Object.keys(data).length) await s.update(table, id(req), data);
+        if (path === 'products' && photo !== undefined) await saveProductPhoto(s, id(req), photo);
         await s.audit(`${path}.updated`, id(req), { fields: Object.keys(b) });
         await s.event(`${path}.updated`, id(req));
         return s.get(table, id(req));
@@ -1402,6 +1469,7 @@ export async function buildApp(options: { realtime?: boolean; logger?: boolean }
     return {
       establishment: {
         name: u.name,
+        business_profile: readBusinessProfile(u.business_profile),
         slug: u.slug,
         is_open: availability.is_open,
         accepting_orders: Boolean(u.is_open),
@@ -1416,7 +1484,7 @@ export async function buildApp(options: { realtime?: boolean; logger?: boolean }
         await saleStockCatalog(
           s,
           await s.list('products', sql`enabled=TRUE`),
-          await s.list('product_variants', sql`enabled=TRUE`),
+          await s.list('product_variants', sql`enabled=TRUE AND deleted_at IS NULL`),
         ),
         u.show_out_of_stock,
       ),

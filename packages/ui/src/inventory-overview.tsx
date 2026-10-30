@@ -1,3 +1,4 @@
+import { unitSymbol } from '../../shared/src/measurement-units.js';
 import { RecordTag } from './record-tags.js';
 import {
   ReplenishmentModal,
@@ -8,6 +9,7 @@ import { Pagination, TableLoading, useClientPagination } from './pagination.js';
 import { useState } from 'react';
 import { session, type Data } from './client.js';
 import { Empty, PageTitle } from './common.js';
+import { AiSummaryButton } from './ai-assistant.js';
 import { Icon } from './appearance.js';
 import { SearchSelect } from './controls.js';
 import { ProductManagementModal } from './product-management.js';
@@ -58,6 +60,7 @@ export function InventoryOverview({
         subtitle="Acompanhe os saldos por local e gerencie reposições e movimentações dos produtos."
         action={
           <div className="button-row inventory-main-actions">
+            <AiSummaryButton focus="stock">Analisar estoque com IA</AiSummaryButton>
             <button
               type="button"
               onClick={() => setLocationsOpen(true)}
@@ -150,10 +153,23 @@ export function InventoryOverview({
                         {locations.find((l) => l.id === b.location_id)?.name ?? 'Local'}
                       </RecordTag>
                     </td>
-                    <td data-label="Físico">{stockQuantity(b.physical_quantity)}</td>
-                    <td data-label="Reservado">{stockQuantity(b.reserved_quantity)}</td>
+                    <td data-label="Físico">
+                      {stockQuantity(b.physical_quantity)}{' '}
+                      {unitSymbol(
+                        products.find((product) => product.id === b.product_id)?.unit_code,
+                      )}
+                    </td>
+                    <td data-label="Reservado">
+                      {stockQuantity(b.reserved_quantity)}{' '}
+                      {unitSymbol(
+                        products.find((product) => product.id === b.product_id)?.unit_code,
+                      )}
+                    </td>
                     <td data-label="Disponível">
-                      {stockQuantity(Number(b.physical_quantity) - Number(b.reserved_quantity))}
+                      {stockQuantity(Number(b.physical_quantity) - Number(b.reserved_quantity))}{' '}
+                      {unitSymbol(
+                        products.find((product) => product.id === b.product_id)?.unit_code,
+                      )}
                     </td>
                     <td data-label="Ações">
                       <button

@@ -64,6 +64,17 @@ describe('identidade pública PWA', () => {
     expect(parsePwaPath(stableBase(id) + 'consumo', 'customer')?.kind).toBe('id');
     expect(parsePwaPath('/bar-do-joao/financeiro', 'customer')).toBeNull();
     expect(parsePwaPath('/bar-do-joao/financeiro', 'admin')).not.toBeNull();
+    expect(parsePwaPath('/bar-do-joao/complementos', 'admin')).not.toBeNull();
+    expect(parsePwaPath('/bar-do-joao/complementos', 'customer')).toBeNull();
+    expect(
+      safePwaSearch(
+        new URLSearchParams('payment_return=' + id + '&status=approved&token=secret'),
+        'customer',
+      ),
+    ).toBe('payment_return=' + id);
+    expect(safePwaSearch(new URLSearchParams('oauth=success&code=secret'), 'admin')).toBe(
+      'oauth=success',
+    );
     for (const path of [
       '/api/v1/orders',
       '/assets/icon.png',

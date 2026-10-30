@@ -8,6 +8,8 @@ import { SearchSelect } from './controls.js';
 import { useFormDialog } from './forms.js';
 import { normalizeStockQuantity, stockQuantity } from './stock-quantity.js';
 import { operationTime } from './operation-format.js';
+import { ProductHelp } from './product-ui.js';
+import { unitSymbol } from '../../shared/src/measurement-units.js';
 const movementNames: Record<string, string> = {
   PURCHASE: 'Compra',
   LOSS: 'Perda',
@@ -35,8 +37,16 @@ export function ProductStock({
   const [locationsOpen, setLocationsOpen] = useState(false);
   const location = (id: string) =>
     context.locations.find((l: Data) => l.id === id)?.name ?? 'Local não identificado';
-  const variant = (id: string) =>
-    context.variants.find((v: Data) => v.id === id)?.name ?? 'Produto / compartilhado';
+  const variant = (id: string) => {
+    const item = [...context.variants, ...(context.archived_variants ?? [])].find(
+      (v: Data) => v.id === id,
+    );
+    return item
+      ? item.name + (item.deleted_at ? ' · removida' : '')
+      : context.product.default_variant_name && context.product.default_variant_name !== 'Padrão'
+        ? context.product.default_variant_name + ' / compartilhado'
+        : 'Produto / compartilhado';
+  };
   function adjust(balance: Data) {
     forms.open({
       title: 'Movimentar estoque',
@@ -66,7 +76,7 @@ export function ProductStock({
             max: values.type === 'LOSS' ? '-0.001' : undefined,
           }),
           required: true,
-          hint: 'Até três casas decimais. Em perda, use valor negativo; em inventário, informe o físico contado.',
+          hint: `Quantidade em ${unitSymbol(context.product.unit_code)}, com até três casas decimais. Em perda, use valor negativo; em inventário, informe o físico contado.`,
         },
         { key: 'reason', label: 'Motivo', type: 'textarea', required: true, minLength: 3 },
       ],
@@ -128,7 +138,10 @@ export function ProductStock({
     <section className="product-config-section">
       <div className="section-head">
         <div>
-          <h3>Estoques por local e variação</h3>
+          <h3>
+            Estoques por local e variação{' '}
+            <span className="product-count">{context.balances.length}</span>
+          </h3>
           <p className="muted small">Físico, reservado e disponível separados para cada estoque.</p>
         </div>
         <div className="button-row">
@@ -137,7 +150,7 @@ export function ProductStock({
             Locais
           </button>
           {canAdjust && (
-            <button type="button" onClick={addBalance}>
+            <button type="button" className="primary" onClick={addBalance}>
               <Icon name="plus" size={16} />
               Vincular estoque
             </button>
@@ -156,11 +169,18 @@ export function ProductStock({
           suas origens configuradas.
         </p>
       )}
-      <p className="product-management-note">
-        O local de baixa é configurado em Estoque e produção. Variações compartilhadas usam o saldo
-        do produto; variações com saldo próprio usam sua linha específica. Nenhum saldo é
-        transferido ao mudar essa configuração.
-      </p>
+      <details className="product-explainer">
+        <summary>
+          <Icon name="help" size={15} />
+          Como funcionam os saldos e a origem de baixa?
+        </summary>
+        <p>
+          Físico é a quantidade registrada; reservado é o saldo comprometido com pedidos. Disponível
+          é o físico menos o reservado. O local de baixa é configurado em Estoque e produção.
+          Variações compartilhadas usam o saldo do produto; variações com saldo próprio usam sua
+          linha específica. Nenhum saldo é transferido ao mudar essa configuração.
+        </p>
+      </details>
       {context.balances.length ? (
         <div className="data-table">
           <table className="inventory-card-table product-stock-table">
@@ -185,11 +205,23 @@ export function ProductStock({
                     </RecordTag>
                   </td>
                   <td data-label="Produto / variação">{variant(b.variant_id)}</td>
-                  <td data-label="Físico">{stockQuantity(b.physical_quantity)}</td>
-                  <td data-label="Reservado">{stockQuantity(b.reserved_quantity)}</td>
+                  <td data-label="Físico">
+                    {stockQuantity(b.physical_quantity)} {unitSymbol(context.product.unit_code)}
+                  </td>
+                  <td data-label="Reservado">
+                    {stockQuantity(b.reserved_quantity)} {unitSymbol(context.product.unit_code)}
+                  </td>
                   <td data-label="Disponível">
-                    <strong>
-                      {stockQuantity(Number(b.physical_quantity) - Number(b.reserved_quantity))}
+                    <strong
+                      className={
+                        'product-stock-available ' +
+                        (Number(b.physical_quantity) - Number(b.reserved_quantity) > 0
+                          ? 'positive'
+                          : 'empty')
+                      }
+                    >
+                      {stockQuantity(Number(b.physical_quantity) - Number(b.reserved_quantity))}{' '}
+                      {unitSymbol(context.product.unit_code)}
                     </strong>
                   </td>
                   <td data-label="Ações">
@@ -338,21 +370,33 @@ export function ProductMovements({
 }) {
   const [balance, setBalance] = useState(initialBalance);
   const [type, setType] = useState('ALL');
+  const [search, setSearch] = useState('');
 
   const label = (id: string) => {
     const b = context.balances.find((b: Data) => b.id === id);
     return (
       (context.locations.find((l: Data) => l.id === b?.location_id)?.name ?? 'Local') +
       ' · ' +
-      (context.variants.find((v: Data) => v.id === b?.variant_id)?.name ?? 'Compartilhado')
+      ([...context.variants, ...(context.archived_variants ?? [])].find(
+        (v: Data) => v.id === b?.variant_id,
+      )?.name ??
+        (context.product.default_variant_name && context.product.default_variant_name !== 'Padrão'
+          ? context.product.default_variant_name
+          : 'Compartilhado'))
     );
   };
   const filtered = context.movements.filter(
-    (m: Data) => (!balance || m.balance_id === balance) && (type === 'ALL' || m.type === type),
+    (m: Data) =>
+      (!balance || m.balance_id === balance) &&
+      (type === 'ALL' || m.type === type) &&
+      [m.reason, label(m.balance_id), movementNames[m.type]]
+        .join(' ')
+        .toLocaleLowerCase('pt-BR')
+        .includes(search.toLocaleLowerCase('pt-BR')),
   );
   const paging = useClientPagination<Data>(
     filtered,
-    JSON.stringify({ product: context.product.id, balance, type }),
+    JSON.stringify({ product: context.product.id, balance, type, search }),
     25,
   );
   return (
@@ -367,6 +411,16 @@ export function ProductMovements({
         <span className="muted small">{filtered.length} registros</span>
       </div>
       <div className="product-config-filters">
+        <label className="product-inline-search">
+          <Icon name="search" size={16} />
+          <input
+            type="search"
+            aria-label="Buscar movimentação do produto"
+            placeholder="Buscar por motivo ou local…"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
+        </label>
         <label>
           Estoque
           <SearchSelect
@@ -397,6 +451,19 @@ export function ProductMovements({
             }}
           />
         </label>
+        {(balance || type !== 'ALL' || search) && (
+          <button
+            type="button"
+            onClick={() => {
+              setBalance('');
+              setType('ALL');
+              setSearch('');
+            }}
+          >
+            <Icon name="close" size={14} />
+            Limpar filtros
+          </button>
+        )}
       </div>
       {filtered.length ? (
         <div className="data-table">
@@ -427,8 +494,19 @@ export function ProductMovements({
                       {label(m.balance_id)}
                     </RecordTag>
                   </td>
-                  <td data-label="Tipo">{movementNames[m.type] ?? m.type}</td>
-                  <td data-label="Quantidade">{stockQuantity(m.quantity)}</td>
+                  <td data-label="Tipo">
+                    <span className="badge">{movementNames[m.type] ?? m.type}</span>
+                  </td>
+                  <td
+                    data-label="Quantidade"
+                    className={
+                      'product-movement-quantity ' +
+                      (Number(m.quantity) < 0 ? 'negative' : 'positive')
+                    }
+                  >
+                    {Number(m.quantity) > 0 ? '+' : ''}
+                    {stockQuantity(m.quantity)} {unitSymbol(m.unit_code)}
+                  </td>
                   <td data-label="Motivo">{m.reason}</td>
                 </tr>
               ))}
@@ -478,7 +556,8 @@ export function ProductRecipe({
           positive: true,
           maxIntegerDigits: 8,
           required: true,
-          hint: 'Ex.: 0,050. Informe até três casas decimais.',
+          hint: (values) =>
+            `Informe em ${unitSymbol(context.ingredients.find((ingredient: Data) => ingredient.id === values.ingredient_id)?.unit_code)}. Consumo do ingrediente para cada item vendido deste produto, com até três casas decimais (ex.: 0,050).`,
         },
       ],
       initial: item,
@@ -510,13 +589,14 @@ export function ProductRecipe({
           <p className="muted small">Quantidades consumidas por unidade vendida do produto.</p>
         </div>
         {recipe ? (
-          <button type="button" onClick={() => edit()}>
+          <button type="button" className="primary" onClick={() => edit()}>
             <Icon name="plus" size={16} />
             Adicionar ingrediente
           </button>
         ) : (
           <button
             type="button"
+            className="primary"
             onClick={() =>
               forms.open({
                 title: 'Criar ficha técnica',
@@ -538,13 +618,16 @@ export function ProductRecipe({
           </button>
         )}
       </div>
-      {context.product.stock_policy !== 'RECIPE' && (
-        <p className="product-management-note">
-          A ficha só é usada nos pedidos quando a política de baixa do produto é Ficha técnica.
-        </p>
-      )}
+      <ProductHelp>
+        {context.product.stock_policy !== 'RECIPE'
+          ? 'Ficha técnica ainda não utilizada na baixa. Para consumir os ingredientes dos pedidos, selecione Ficha técnica em Estoque e produção e salve o cadastro.'
+          : 'Baixa por ficha técnica ativa. Cada unidade vendida consome as quantidades abaixo, nos estoques de origem dos ingredientes.'}
+      </ProductHelp>
       {!recipe ? (
-        <Empty>Este produto ainda não possui ficha técnica.</Empty>
+        <Empty>
+          Este produto ainda não possui ficha técnica. Crie a ficha para cadastrar os ingredientes e
+          o consumo por unidade vendida.
+        </Empty>
       ) : context.recipe_items.length ? (
         <div className="product-config-list">
           {context.recipe_items.map((item: Data) => (
@@ -554,18 +637,37 @@ export function ProductRecipe({
                   {context.ingredients.find((p: Data) => p.id === item.ingredient_id)?.name ??
                     'Ingrediente'}
                 </strong>
-                <small>{stockQuantity(item.quantity)} por unidade</small>
+                <small>
+                  {stockQuantity(item.quantity)}{' '}
+                  {unitSymbol(
+                    context.ingredients.find(
+                      (ingredient: Data) => ingredient.id === item.ingredient_id,
+                    )?.unit_code,
+                  )}{' '}
+                  por unidade vendida
+                </small>
               </div>
               <div className="button-row">
                 <button
                   type="button"
-                  aria-label={'Editar ingrediente ' + item.ingredient_id}
+                  aria-label={
+                    'Editar ingrediente ' +
+                    (context.ingredients.find((p: Data) => p.id === item.ingredient_id)?.name ??
+                      item.ingredient_id)
+                  }
                   onClick={() => edit(item)}
                 >
                   <Icon name="edit" size={16} />
+                  Editar
                 </button>
                 <button
                   type="button"
+                  className="danger"
+                  aria-label={
+                    'Remover ingrediente ' +
+                    (context.ingredients.find((p: Data) => p.id === item.ingredient_id)?.name ??
+                      item.ingredient_id)
+                  }
                   onClick={() =>
                     forms.open({
                       title: 'Remover ingrediente',
@@ -596,9 +698,11 @@ export function ProductRecipe({
 export function ProductAddons({
   context,
   refresh,
+  onManageGroups,
 }: {
   context: Data;
   refresh: () => Promise<void>;
+  onManageGroups?: () => void;
 }) {
   const forms = useFormDialog();
   const groups = context.groups.filter((g: Data) =>
@@ -608,38 +712,57 @@ export function ProductAddons({
     <section className="product-config-section">
       <div className="section-head">
         <div>
-          <h3>Grupos de adicionais deste produto</h3>
+          <h3>
+            Grupos de adicionais deste produto{' '}
+            <span className="product-count">{groups.length}</span>
+          </h3>
           <p className="muted small">
-            Reutilize grupos cadastrados sem criar vínculos em outra tela.
+            Defina as opções que o cliente pode escolher ao adicionar este produto.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() =>
-            forms.open({
-              title: 'Vincular grupo de adicionais',
-              fields: [
-                {
-                  key: 'group_id',
-                  label: 'Grupo de adicionais',
-                  type: 'select',
-                  required: true,
-                  options: context.groups
-                    .filter((g: Data) => !groups.some((x: Data) => x.id === g.id))
-                    .map((g: Data) => ({ id: g.id, name: g.name })),
+        <div className="button-row">
+          {onManageGroups && (
+            <button type="button" onClick={onManageGroups}>
+              <Icon name="folder" size={16} />
+              Gerenciar grupos e adicionais
+            </button>
+          )}
+          <button
+            type="button"
+            className="primary"
+            disabled={groups.length === context.groups.length}
+            onClick={() =>
+              forms.open({
+                title: 'Vincular grupo de adicionais',
+                fields: [
+                  {
+                    key: 'group_id',
+                    label: 'Grupo de adicionais',
+                    type: 'select',
+                    required: true,
+                    options: context.groups
+                      .filter((g: Data) => !groups.some((x: Data) => x.id === g.id))
+                      .map((g: Data) => ({ id: g.id, name: g.name })),
+                  },
+                ],
+                onSubmit: async (values) => {
+                  await api('/product-modifiers', { product_id: context.product.id, ...values });
+                  await refresh();
                 },
-              ],
-              onSubmit: async (values) => {
-                await api('/product-modifiers', { product_id: context.product.id, ...values });
-                await refresh();
-              },
-            })
-          }
-        >
-          <Icon name="plus" size={16} />
-          Vincular grupo
-        </button>
+              })
+            }
+          >
+            <Icon name="plus" size={16} />
+            Vincular grupo
+          </button>
+        </div>
       </div>
+      {!context.groups.length && (
+        <ProductHelp>
+          Comece em Gerenciar grupos e adicionais para cadastrar as opções, depois vincule um grupo
+          a este produto.
+        </ProductHelp>
+      )}
       {!groups.length ? (
         <Empty>Nenhum grupo vinculado a este produto.</Empty>
       ) : (
@@ -648,12 +771,17 @@ export function ProductAddons({
             <div className="section-head">
               <div>
                 <h3>{g.name}</h3>
+                <span className={'badge ' + (Number(g.min_choices) > 0 ? 'pending' : 'available')}>
+                  {Number(g.min_choices) > 0 ? 'Obrigatório' : 'Opcional'}
+                </span>
                 <small>
                   Escolha de {g.min_choices} a {g.max_choices}
                 </small>
               </div>
               <button
                 type="button"
+                className="danger"
+                aria-label={'Desvincular grupo ' + g.name}
                 onClick={() => {
                   const link = context.links.find((l: Data) => l.group_id === g.id);
                   forms.open({
@@ -683,6 +811,11 @@ export function ProductAddons({
                     {!m.enabled ? ' · Inativo' : ''}
                   </span>
                 ))}
+              {!context.modifiers.some((m: Data) => m.group_id === g.id) && (
+                <p className="muted small">
+                  Nenhum adicional neste grupo. Cadastre as opções em Gerenciar grupos e adicionais.
+                </p>
+              )}
             </div>
           </article>
         ))

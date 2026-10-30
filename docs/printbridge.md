@@ -12,6 +12,35 @@ Integração com [PrintBridge Userp](https://printbridge.userp.com.br/) usando o
 
 As impressoras autorizadas vêm do aplicativo local. `status: unknown` do driver não comprova que o equipamento esteja pronto. O indicador do cabeçalho abre a configuração e mostra se a fila está ativa. Pausar ou fechar a página não cancela trabalhos que o aplicativo nativo já aceitou.
 
+## Agentes: quando são necessários
+
+A antiga aba **Agentes** criava credenciais do programa Node TCP/IP. Esse caminho continua disponível, mas foi movido para **Impressão → PrintBridge → Impressão TCP/IP**, uma seção avançada recolhida por padrão. Não é uma etapa obrigatória do PrintBridge.
+
+| Caminho     | Cadastro e execução                                                                                                         | Quando usar                                                                                                    |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| PrintBridge | Conectar, vincular e ativar a fila local cadastra o computador automaticamente. O navegador guarda a credencial da estação. | Impressoras instaladas no computador, PDF pelo driver, térmica/USB e impressão enviada de outros dispositivos. |
+| TCP/IP      | Criar credencial TCP/IP, configurar o ambiente e executar `apps/print-agent`.                                               | Integração técnica com impressoras ESC/POS de rede, sem usar o PrintBridge.                                    |
+
+Os dois transportes precisam de um agente autenticado para consultar a fila do Mesa. A criação manual não é necessária para os computadores PrintBridge. A lista **Computadores de impressão** mostra apenas PrintBridge; os agentes de rede ficam na seção TCP/IP. Ambos podem ser desativados ou reativados sem apagar os documentos. Agentes e credenciais existentes permanecem válidos. O endereço antigo `?aba=agentes` abre a seção avançada.
+
+### Configurar TCP/IP
+
+Na seção avançada, clique em **Criar agente TCP/IP**, informe o nome e guarde a credencial exibida uma única vez. Selecione a impressora cadastrada no Mesa e use **Copiar configuração**. No arquivo `.env` protegido do computador agente, substitua `IP_LOCAL_DA_IMPRESSORA` pelo IP real; ajuste a porta se necessário. Para produção, mantenha `NODE_ENV=production` e API em HTTPS.
+
+```dotenv
+NODE_ENV=production
+PRINT_API_URL=https://mesa.userp.com.br/api/v1
+PRINT_AGENT_TOKEN=<credencial_emitida_no_cadastro>
+PRINT_PRINTER_ID=<id_da_impressora_cadastrada_no_mesa>
+PRINT_PRINTERS_JSON=
+PRINT_HOST=<ip_local_da_impressora>
+PRINT_PORT=9100
+```
+
+Após compilar o projeto com Node 24, execute `node --env-file=.env dist/apps/print-agent/src/index.js` no computador que alcança a impressora de rede. O processo precisa permanecer ativo. `PRINT_PRINTERS_JSON` permite mapear vários destinos, conforme o README, e tem prioridade sobre o mapeamento de uma única impressora.
+
+A consulta da fila atualiza a disponibilidade do agente TCP e as impressoras mapeadas. **Aguardando conexão** indica que o programa ainda não se apresentou. **Online** indica comunicação com a API nos últimos 45 segundos; não é um teste de papel, tinta ou disponibilidade física da impressora. Desativar a credencial bloqueia novas consultas. Um destino sem agente disponível conserva os jobs pendentes na fila.
+
 ## Fichas e cupons
 
 A confirmação de pedido conserva a fila de fichas por setor. Cupons de pedido/comanda continuam sendo emitidos nos respectivos modais por **Enviar para térmica**. PDF, impressão pelo diálogo do navegador e o agente TCP existente continuam disponíveis.
@@ -36,7 +65,7 @@ As rotas `/print/jobs/:id/bridge/prepare`, `/bridge/document` e `/bridge/status`
 
 ## Verificação
 
-Os testes incluem bytes PDF estáveis, ESC/POS, resposta perdida, retomada por identificador nativo, isolamento entre agentes/unidades, ausência de tokens na persistência, emissão antiga, conferência de resultado incerto e segunda via. O teste do navegador utiliza o SDK real com o WebSocket do aplicativo simulado; não imprime em equipamento real. A regressão conserva o teste do agente TCP. A saída física e o papel do driver devem ser conferidos na impressora escolhida.
+Os testes incluem bytes PDF estáveis, ESC/POS, resposta perdida, retomada por identificador nativo, isolamento entre agentes/unidades, ausência de tokens na persistência, emissão antiga, conferência de resultado incerto e segunda via. O teste do navegador utiliza o SDK real com o WebSocket do aplicativo simulado; não imprime em equipamento real. A validação TCP executa o programa Node real contra a API e um servidor TCP local que simula a impressora: confere bytes ESC/POS, destino, confirmação, revogação e preservação do consumo. O teste de navegador confere a emissão única da credencial, a separação dos transportes, ativação/desativação e a nova localização da configuração. A saída física e o papel do driver devem ser conferidos na impressora escolhida.
 
 ## Impressão remota pelo celular
 

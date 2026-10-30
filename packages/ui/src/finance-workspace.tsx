@@ -19,16 +19,17 @@ import { SearchSelect } from './controls.js';
 import { useFormDialog } from './forms.js';
 import { operationTime, shortId } from './operation-format.js';
 import { financeDay, financeCsv, financeChange } from './finance-format.js';
+import { AiSummaryButton } from './ai-assistant.js';
 
 const tabs = [
-  ['overview', 'Visão geral'],
-  ['sales', 'Vendas'],
-  ['payments', 'Pagamentos'],
-  ['receivables', 'Contas a receber'],
-  ['cash', 'Caixa'],
-  ['flow', 'Fluxo de recebimentos'],
-  ['closures', 'Fechamentos'],
-];
+  ['overview', 'Visão geral', 'dashboard'],
+  ['sales', 'Vendas', 'orders'],
+  ['payments', 'Pagamentos', 'payments'],
+  ['receivables', 'Contas a receber', 'receipt'],
+  ['cash', 'Caixa', 'cash'],
+  ['flow', 'Fluxo de recebimentos', 'finance'],
+  ['closures', 'Fechamentos', 'check'],
+] as const;
 const methodNames: Record<string, string> = {
   PIX: 'Pix',
   CASH: 'Dinheiro',
@@ -36,6 +37,7 @@ const methodNames: Record<string, string> = {
   CARD_MANUAL: 'Cartão',
   CARD: 'Cartão',
   sandbox: 'Gateway de teste',
+  mercadopago: 'Mercado Pago',
   REFUND: 'Estorno',
   WITHDRAWAL: 'Sangria',
   SUPPLY: 'Suprimento',
@@ -591,10 +593,24 @@ export function FinanceWorkspace({ can }: { can: (permission: string) => boolean
           <h1>Financeiro</h1>
           <p className="muted">Acompanhe faturamento, recebimentos e saldos em um só lugar.</p>
         </div>
-        <button onClick={retryPanel} disabled={loading}>
-          <Icon name="refresh" size={16} />
-          Atualizar painel
-        </button>
+        <div className="button-row">
+          <AiSummaryButton
+            focus="finance"
+            period={dates}
+            disabled={Boolean(unit && unit !== s?.actor_unit_id)}
+            title={
+              unit && unit !== s?.actor_unit_id
+                ? 'Acesse a filial selecionada para gerar o resumo com a conexão de IA dela.'
+                : 'Resumo da filial atual no período aplicado.'
+            }
+          >
+            Resumir período com IA
+          </AiSummaryButton>
+          <button onClick={retryPanel} disabled={loading}>
+            <Icon name="refresh" size={16} />
+            Atualizar painel
+          </button>
+        </div>
       </div>
       <div className="finance-period panel">
         <label>
@@ -668,7 +684,7 @@ export function FinanceWorkspace({ can }: { can: (permission: string) => boolean
         </label>
       </div>
       <div
-        className="finance-tabs"
+        className="finance-tabs system-tabs"
         role="tablist"
         aria-label="Financeiro"
         onKeyDown={(e) => {
@@ -690,7 +706,7 @@ export function FinanceWorkspace({ can }: { can: (permission: string) => boolean
           }
         }}
       >
-        {tabs.map(([id, label]) => (
+        {tabs.map(([id, label, icon]) => (
           <button
             key={id}
             id={'finance-tab-' + id}
@@ -701,6 +717,7 @@ export function FinanceWorkspace({ can }: { can: (permission: string) => boolean
             className={tab === id ? 'active' : ''}
             onClick={() => selectTab(id)}
           >
+            <Icon name={icon} size={16} />
             {label}
           </button>
         ))}

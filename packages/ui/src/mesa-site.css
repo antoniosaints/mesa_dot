@@ -239,6 +239,7 @@ body.mesa-portal-active {
 }
 .mesa-preview-wrap {
   position: relative;
+  min-width: 0;
   padding: 26px 0 25px;
   isolation: isolate;
 }
@@ -317,18 +318,6 @@ body.mesa-portal-active {
 }
 .mesa-preview-tabs button {
   flex: 1;
-  min-height: 34px;
-  padding: 4px 12px;
-  border: 0;
-  background: transparent;
-  color: #71819c;
-  border-radius: 6px;
-  font-size: 10px;
-}
-.mesa-preview-tabs button[aria-selected='true'] {
-  background: #fff;
-  color: #0757f9;
-  box-shadow: 0 1px 5px #263c5c12;
 }
 .mesa-preview-content {
   padding: 20px 18px;
