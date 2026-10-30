@@ -1,0 +1,10 @@
+import { defineConfig } from 'vitest/config';
+export default defineConfig({
+  test: {
+    setupFiles: ['tests/setup.ts'],
+    fileParallelism: false,
+    testTimeout: 30000,
+    hookTimeout: 60000,
+    exclude: ['node_modules/**', 'tests/e2e/**', '**/dist/**'],
+  },
+});

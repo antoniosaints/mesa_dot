@@ -1,0 +1,132 @@
+# Da raiz: docker compose --env-file .env.production -f infra/compose.production.yaml ...
+# Sem portas públicas: use compose.vm.yaml ou domínios do EasyPanel.
+name: mesa
+
+x-build: &backend-build
+  context: ..
+  dockerfile: infra/Dockerfile
+  target: runtime
+  args: &public-urls
+    VITE_ADMIN_URL: https://${ADMIN_DOMAIN:?Defina ADMIN_DOMAIN}
+    VITE_CUSTOMER_URL: https://${CUSTOMER_DOMAIN:?Defina CUSTOMER_DOMAIN}
+    VITE_WAITER_URL: https://${WAITER_DOMAIN:?Defina WAITER_DOMAIN}
+    VITE_KITCHEN_URL: https://${KITCHEN_DOMAIN:?Defina KITCHEN_DOMAIN}
+
+x-runtime: &runtime
+  NODE_ENV: production
+  API_HOST: 0.0.0.0
+  API_PORT: '3000'
+  DATABASE_URL: mysql://${MYSQL_USER:-mesa}:${MYSQL_PASSWORD:?Defina MYSQL_PASSWORD}@mysql:3306/${MYSQL_DATABASE:-mesa}
+  REDIS_URL: redis://:${REDIS_PASSWORD:?Defina REDIS_PASSWORD}@redis:6379
+  DOCUMENT_KEY: ${DOCUMENT_KEY:?Defina DOCUMENT_KEY}
+  PAYMENT_WEBHOOK_SECRET: ${PAYMENT_WEBHOOK_SECRET:?Defina PAYMENT_WEBHOOK_SECRET}
+  CORS_ORIGINS: https://${ADMIN_DOMAIN},https://${CUSTOMER_DOMAIN},https://${WAITER_DOMAIN},https://${KITCHEN_DOMAIN}
+  CUSTOMER_PUBLIC_URL: https://${CUSTOMER_DOMAIN}
+  WEB_PUSH_PUBLIC_KEY: ${WEB_PUSH_PUBLIC_KEY:?Defina WEB_PUSH_PUBLIC_KEY}
+  WEB_PUSH_PRIVATE_KEY: ${WEB_PUSH_PRIVATE_KEY:?Defina WEB_PUSH_PRIVATE_KEY}
+  WEB_PUSH_SUBJECT: ${WEB_PUSH_SUBJECT:-https://mesa.userp.com.br}
+
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-mesa}
+      MYSQL_USER: ${MYSQL_USER:-mesa}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Defina MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Defina MYSQL_ROOT_PASSWORD}
+      TZ: UTC
+    command:
+      [
+        '--character-set-server=utf8mb4',
+        '--collation-server=utf8mb4_0900_ai_ci',
+        '--default-time-zone=+00:00',
+      ]
+    volumes: ['mysql-data:/var/lib/mysql']
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'MYSQL_PWD="$$MYSQL_ROOT_PASSWORD" mysql -h 127.0.0.1 -uroot -Nse "SELECT 1" >/dev/null',
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 40
+      start_period: 30s
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Defina REDIS_PASSWORD}
+      REDISCLI_AUTH: ${REDIS_PASSWORD:?Defina REDIS_PASSWORD}
+    command:
+      [
+        'sh',
+        '-c',
+        'exec redis-server --appendonly yes --maxmemory-policy noeviction --requirepass "$$REDIS_PASSWORD"',
+      ]
+    volumes: ['redis-data:/data']
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  migrate:
+    image: mesa-backend:${MESA_IMAGE_TAG:-local}
+    build: *backend-build
+    restart: 'no'
+    environment: *runtime
+    command: ['node', 'dist/packages/database/src/migrate.js']
+    depends_on:
+      mysql: { condition: service_healthy }
+      redis: { condition: service_healthy }
+  api:
+    image: mesa-backend:${MESA_IMAGE_TAG:-local}
+    build: *backend-build
+    restart: unless-stopped
+    environment: *runtime
+    init: true
+    stop_grace_period: 30s
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3000/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+  worker:
+    image: mesa-backend:${MESA_IMAGE_TAG:-local}
+    build: *backend-build
+    restart: unless-stopped
+    environment: *runtime
+    command: ['node', 'dist/apps/worker/src/index.js']
+    init: true
+    stop_grace_period: 30s
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+  web:
+    image: mesa-web:${MESA_IMAGE_TAG:-local}
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile
+      target: web
+      args: *public-urls
+    restart: unless-stopped
+    environment:
+      ADMIN_DOMAIN: ${ADMIN_DOMAIN}
+      CUSTOMER_DOMAIN: ${CUSTOMER_DOMAIN}
+      WAITER_DOMAIN: ${WAITER_DOMAIN}
+      KITCHEN_DOMAIN: ${KITCHEN_DOMAIN}
+      API_UPSTREAM: api:3000
+    depends_on:
+      api: { condition: service_healthy }
+volumes:
+  mysql-data:
+  redis-data:

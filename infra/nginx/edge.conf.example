@@ -1,0 +1,18 @@
+# Nginx no HOST da VM Docker. Ajuste os quatro domínios antes de instalar.
+# Certbot adiciona HTTPS após a validação HTTP inicial.
+map $http_upgrade $mesa_edge_connection { default upgrade; '' close; }
+server {
+    listen 80;
+    server_name mesa.userp.com.br app.mesa.userp.com.br garcom.mesa.userp.com.br cozinha.mesa.userp.com.br;
+    client_max_body_size 3m;
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $mesa_edge_connection;
+        proxy_read_timeout 75s;
+    }
+}

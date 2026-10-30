@@ -1,0 +1,11 @@
+CREATE INDEX idx_session_status ON table_sessions(tenant_id,establishment_id,status);
+CREATE INDEX idx_order_table_status ON orders(tenant_id,establishment_id,table_id,status);
+CREATE INDEX idx_order_tab ON orders(tenant_id,establishment_id,tab_id);
+CREATE INDEX idx_order_customer ON orders(tenant_id,establishment_id,customer_id,status);
+CREATE INDEX idx_ticket_item_status ON tickets(tenant_id,establishment_id,order_item_id,status);
+CREATE INDEX idx_service_status ON service_requests(tenant_id,establishment_id,status);
+CREATE INDEX idx_print_status ON print_jobs(tenant_id,establishment_id,status,lease_until);
+CREATE INDEX idx_visitor_expiry ON visitor_sessions(expires_at);
+CREATE INDEX idx_holds_expiry ON checkout_holds(tenant_id,establishment_id,status,expires_at);
+CREATE INDEX idx_financial_tab ON financial_entries(tenant_id,establishment_id,tab_id);
+CREATE INDEX idx_payment_intent_status ON payments(tenant_id,establishment_id,intent_id,status);

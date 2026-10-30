@@ -1,0 +1,69 @@
+# Exemplo TLS legado para instalações existentes.
+# Novos deploys: README.md e infra/nginx/default.conf.template (com Certbot ou EasyPanel).
+# Include dentro de http {}; adapte DNS, certificados e diretórios.
+map $host $mesa_app {
+    default customer;
+    mesa.userp.com.br admin;
+    gestao.exemplo.com admin;
+    garcom.exemplo.com waiter;
+    cozinha.exemplo.com kitchen;
+}
+map $http_upgrade $mesa_connection {
+    default upgrade;
+    '' close;
+}
+upstream mesa_api { server 127.0.0.1:3000; }
+server {
+    listen 443 ssl;
+    server_name mesa.userp.com.br app.exemplo.com gestao.exemplo.com garcom.exemplo.com cozinha.exemplo.com;
+    ssl_certificate /etc/ssl/mesa/fullchain.pem;
+    ssl_certificate_key /etc/ssl/mesa/privkey.pem;
+    # Copie os quatro dist do Vite para customer, admin, waiter e kitchen.
+    root /srv/mesa/$mesa_app;
+    client_max_body_size 3m;
+    add_header X-Content-Type-Options nosniff always;
+    add_header Referrer-Policy strict-origin-when-cross-origin always;
+    location /api/ {
+        proxy_pass http://mesa_api;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_cache off;
+    }
+    location /socket.io/ {
+        proxy_pass http://mesa_api;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $mesa_connection;
+        proxy_set_header Host $host;
+    }
+    location ^~ /assets/ {
+        try_files $uri =404;
+        add_header Cache-Control "public, max-age=31536000, immutable";
+    }
+    location = /sw.js {
+        try_files $uri =404;
+        add_header Cache-Control "no-cache";
+        add_header Service-Worker-Allowed /;
+    }
+    location ^~ /pwa/ {
+        proxy_pass http://mesa_api;
+        proxy_set_header Host $host;
+        proxy_set_header X-Mesa-App $mesa_app;
+        proxy_cache off;
+    }
+    # Na origem admin, / apresenta a landing Mesa; as outras origens preservam suas entradas.
+    location = / { try_files /index.html =404; }
+    location ~ ^/(dashboard|salao|pedidos|producao|cardapio|pagamentos|caixa|financeiro|estoque|impressao|estacao-impressao|equipe|configuracoes|mesas|entregas|chamados|conferir-ficha|consumo|minhas-fichas|entrar|criar-conta|gestor)(/|$) {
+        try_files $uri /index.html;
+        add_header Cache-Control no-store;
+    }
+    location / { try_files $uri @mesa_pwa; }
+    location @mesa_pwa {
+        proxy_pass http://mesa_api;
+        # Sobrescreve qualquer valor enviado pelo cliente.
+        proxy_set_header X-Mesa-App $mesa_app;
+        proxy_set_header Host $host;
+        proxy_cache off;
+    }
+}

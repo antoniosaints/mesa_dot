@@ -1,0 +1,2 @@
+ALTER TABLE print_agents ADD COLUMN transport ENUM('TCP','PRINTBRIDGE') NOT NULL DEFAULT 'TCP';
+ALTER TABLE print_jobs ADD COLUMN bridge_delivery JSON NULL;

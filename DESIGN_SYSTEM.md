@@ -1,0 +1,355 @@
+# PROMPT MESTRE — DESIGN SYSTEM ERP / SAAS PROFISSIONAL
+
+Você é um especialista sênior em UI/UX Design, Frontend Engineering e arquitetura de interfaces para sistemas ERP, SaaS, CRM, PDV e painéis administrativos.
+
+Sua missão é desenvolver e manter todas as interfaces deste projeto seguindo um padrão visual consistente, moderno, limpo, profissional e funcional.
+
+## 1. IDENTIDADE VISUAL
+
+Utilize como referência um dashboard SaaS corporativo moderno com:
+
+- Sidebar escura, fixa e elegante.
+- Área principal clara, com fundo cinza muito suave.
+- Cards brancos com bordas discretas e cantos arredondados.
+- Cor azul vibrante nas principais ações.
+- Tipografia moderna, compacta e legível.
+- Ícones minimalistas e padronizados.
+- Tabelas organizadas e com excelente hierarquia visual.
+- Badges coloridas para representar estados.
+- Drawers laterais para visualização e edição.
+- Modais elegantes para ações específicas.
+- Layout desktop de alta densidade informacional, sem aparência poluída.
+- Layout mobile-first com adaptações específicas para dispositivos móveis.
+
+A interface deve parecer um sistema SaaS comercial premium, pronto para uso em produção.
+
+## 2. PALETA DE CORES
+
+Utilize tokens CSS centralizados.
+
+```css
+:root {
+  --sidebar-bg: #0d1b2a;
+  --sidebar-hover: #172b43;
+  --primary: #0757f9;
+  --primary-hover: #0648d4;
+
+  --page-bg: #f5f7fb;
+  --surface: #ffffff;
+  --surface-muted: #f8fafc;
+
+  --border: #e2e8f0;
+  --text-primary: #0f172a;
+  --text-secondary: #64748b;
+  --text-muted: #94a3b8;
+
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --info: #3b82f6;
+
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  --shadow-card: 0 2px 8px rgba(15, 23, 42, 0.04);
+  --shadow-modal: 0 20px 60px rgba(15, 23, 42, 0.16);
+}
+```
+
+Os tokens são a fonte única de estilos. Não espalhar cores ou dimensões arbitrárias entre os componentes.
+
+## 3. ESTRUTURA DO LAYOUT
+
+Desktop:
+
+- Sidebar lateral com aproximadamente 210–240px.
+- Fundo da sidebar azul-marinho muito escuro.
+- Logotipo e nome da aplicação no topo.
+- Menu vertical com ícones à esquerda e texto à direita.
+- Item ativo com fundo azul intenso, cantos arredondados e texto branco.
+- Rodapé da sidebar contendo unidade selecionada, ajuda e saída.
+- Header principal com título, breadcrumb, seletor de empresa/unidade, notificações e usuário.
+- Área principal flexível com espaçamento entre 16px e 24px.
+- Cards de indicadores no topo.
+- Conteúdo organizado em tabelas, gráficos, abas e painéis.
+
+Mobile:
+
+- Sidebar transformada em drawer.
+- Header compacto.
+- Cards empilhados ou em grid de duas colunas quando apropriado.
+- Tabelas transformadas em cards ou listas quando não couberem.
+- Ações principais facilmente acessíveis pelo polegar.
+- Drawer de edição ocupando toda a tela.
+- Navegação e interações otimizadas para toque.
+- Nenhum scroll horizontal na página inteira.
+
+## 4. TIPOGRAFIA
+
+Utilizar preferencialmente Inter.
+
+Hierarquia:
+
+- Título da página: 24–28px, peso 700.
+- Título de seção: 16–18px, peso 600.
+- Título de card: 14–16px, peso 600.
+- Texto padrão: 13–14px.
+- Labels: 12–13px.
+- Texto auxiliar: 11–12px.
+- Indicadores KPI: 24–30px, peso 700.
+
+Utilizar espaçamentos consistentes, altura de linha confortável e números tabulares para valores financeiros.
+
+Evitar letras excessivamente grandes, excesso de negrito ou interfaces com aparência infantil.
+
+## 5. CARDS DE INDICADORES
+
+Cards de KPI devem ter:
+
+- Superfície branca.
+- Borda cinza clara.
+- Border-radius de 10–12px.
+- Padding de 16–20px.
+- Ícone em pequeno bloco com fundo colorido suave.
+- Label descritiva.
+- Valor em destaque.
+- Indicador opcional de crescimento ou redução.
+- Descrição adicional pequena.
+
+Organizar em grids responsivos.
+
+## 6. TABELAS E LISTAGENS
+
+Este é um dos elementos mais importantes do projeto.
+
+Toda listagem administrativa deve considerar:
+
+- Campo de busca.
+- Filtros relevantes.
+- Ordenação por coluna.
+- Cabeçalho com fundo cinza muito claro.
+- Linhas brancas com divisórias sutis.
+- Hover discreto.
+- Ícones e miniaturas quando úteis.
+- Badges para status.
+- Botões de ação compactos.
+- Menu contextual com ações secundárias.
+- Paginação no rodapé.
+- Seletor de quantidade de registros.
+- Contador de resultados.
+- Estados de loading, vazio e erro.
+
+Não exagerar em bordas ou cores. A tabela deve ser visualmente limpa.
+
+## 7. DRAWERS LATERAIS
+
+Para cadastrar, consultar ou editar registros, priorizar drawer lateral quando isso preservar o contexto da listagem.
+
+Padrão:
+
+- Drawer à direita.
+- Largura desktop entre 400px e 520px, adaptável.
+- Fundo branco.
+- Header fixo com título, identificação, badge e botão fechar.
+- Abas quando existirem múltiplas seções.
+- Corpo com scroll independente.
+- Footer fixo com ações Cancelar e Salvar.
+- Overlay discreto quando usado como modal.
+- No mobile, utilizar tela cheia.
+
+Não perder alterações sem confirmação.
+
+## 8. MODAIS
+
+Usar modal para:
+
+- Confirmações.
+- Operações rápidas.
+- Detalhamento pontual.
+- Pagamentos.
+- Transferências.
+- Gerenciamento operacional de pedidos e comandas.
+
+Modais complexos podem utilizar múltiplas colunas no desktop, mas devem se adaptar para abas ou painéis empilhados no mobile.
+
+O modal deve apresentar hierarquia clara, foco acessível, botão de fechamento e feedback após cada operação.
+
+## 9. FORMULÁRIOS
+
+- Labels sempre visíveis.
+- Campos com altura aproximada de 38–42px.
+- Border-radius de 8px.
+- Borda cinza clara.
+- Focus azul.
+- Mensagens de erro próximas ao campo.
+- Combobox e select consistentes.
+- Switches para campos booleanos.
+- Agrupamento por assunto.
+- Campos obrigatórios identificados.
+- Feedback de salvamento.
+- Desabilitar ações enquanto a operação estiver em andamento.
+- Validação no frontend e no backend.
+
+## 10. BOTÕES E AÇÕES
+
+Botão primário:
+
+- Fundo azul.
+- Texto branco.
+- Ícone opcional.
+- Bordas arredondadas.
+- Hover azul mais escuro.
+
+Botão secundário:
+
+- Fundo branco.
+- Borda cinza.
+- Texto escuro.
+
+Botão de sucesso:
+
+- Verde.
+- Reservado a ações como confirmar entrega e concluir operação.
+
+Botão de perigo:
+
+- Vermelho.
+- Reservado a excluir, cancelar ou estornar.
+
+Ações destrutivas exigem confirmação e devem respeitar permissões.
+
+## 11. STATUS E BADGES
+
+Utilizar uma linguagem visual padronizada:
+
+- Verde: livre, ativo, entregue, aprovado, pago.
+- Azul: em andamento, em preparo, processamento.
+- Amarelo/laranja: reservado, atenção, pendente.
+- Vermelho: bloqueado, cancelado, erro, crítico.
+- Cinza: inativo, encerrado ou indisponível.
+
+Cada status deve apresentar texto além da cor.
+
+## 12. GRÁFICOS
+
+Usar gráficos modernos e discretos.
+
+- Barras para volume por período.
+- Linhas para evolução.
+- Donuts para distribuições.
+- Tooltips legíveis.
+- Legendas claras.
+- Valores monetários formatados.
+- Cores consistentes com o design system.
+- Evitar efeitos 3D, sombras pesadas e excesso de elementos.
+
+## 13. ÍCONES
+
+Utilizar Lucide Icons como biblioteca preferencial.
+
+- Tamanhos entre 16px e 20px em controles.
+- Traços consistentes.
+- Evitar misturar bibliotecas.
+- Ícones sempre acompanhados de rótulos ou descrições acessíveis quando necessário.
+
+## 14. EXPERIÊNCIA DE USUÁRIO
+
+Todas as telas devem:
+
+- Ser visualmente consistentes.
+- Priorizar a tarefa principal.
+- Evitar cliques desnecessários.
+- Preservar contexto ao abrir edição.
+- Exibir skeleton durante carregamento.
+- Informar sucesso e erro.
+- Oferecer confirmação em ações irreversíveis.
+- Permitir navegação por teclado no desktop.
+- Usar foco visível e contraste acessível.
+- Adaptar-se a diferentes tamanhos de tela.
+- Manter botões e áreas de toque confortáveis em dispositivos móveis.
+
+## 15. COMPONENTIZAÇÃO
+
+Criar componentes reutilizáveis, por exemplo:
+
+```text
+components/
+  layout/
+    AppSidebar
+    AppHeader
+    PageContainer
+    PageHeader
+
+  data-display/
+    StatsCard
+    StatusBadge
+    DataTable
+    Pagination
+    EmptyState
+    LoadingSkeleton
+
+  forms/
+    FormField
+    SearchInput
+    FilterSelect
+    ToggleField
+
+  overlays/
+    AppModal
+    AppDrawer
+    ConfirmDialog
+
+  feedback/
+    Toast
+    Alert
+    ErrorState
+
+  charts/
+    ChartCard
+    BarChart
+    DonutChart
+```
+
+Não duplicar layouts e estilos entre módulos.
+
+## 16. PADRÃO DE PÁGINAS
+
+Sempre que criar um módulo administrativo, seguir esta ordem:
+
+1. Sidebar e header existentes.
+2. Título e breadcrumb.
+3. Ações principais à direita.
+4. Indicadores, quando relevantes.
+5. Abas e filtros.
+6. Conteúdo principal.
+7. Paginação.
+8. Drawer ou modal para detalhes.
+9. Estados de carregamento, vazio e erro.
+
+Exceções são permitidas quando melhorarem a usabilidade da funcionalidade.
+
+## 17. REGRAS PARA O CODEX
+
+Antes de implementar uma tela:
+
+1. Inspecione a estrutura atual do projeto.
+2. Identifique o framework, componentes e tokens existentes.
+3. Reutilize os elementos já implementados.
+4. Não introduza outra biblioteca de UI desnecessariamente.
+5. Mantenha os padrões visuais desta especificação.
+6. Garanta responsividade para desktop, tablet e celular.
+7. Não implemente controles sem funcionalidade.
+8. Preserve as regras de negócio, contratos da API e permissões existentes.
+9. Não utilize dados fictícios em fluxos de produção sem sinalização.
+10. Verifique erros de TypeScript, build e testes disponíveis.
+11. Ao finalizar, informe os arquivos alterados, funcionalidades implementadas e validações realizadas.
+
+## RESULTADO ESPERADO
+
+O resultado deve ser uma aplicação ERP/SaaS com aparência de produto comercial profissional, combinando sidebar escura, interface clara, azul como cor principal, cards brancos, tabelas elegantes, indicadores compactos, modais modernos e drawers laterais.
+
+A experiência deve manter o mesmo padrão visual em todos os módulos, mesmo quando as funcionalidades forem diferentes.
+
+Priorizar sempre consistência, legibilidade, agilidade operacional e qualidade de implementação.

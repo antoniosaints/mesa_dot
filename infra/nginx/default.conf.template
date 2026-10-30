@@ -1,0 +1,59 @@
+# A imagem oficial Nginx substitui variáveis de ambiente conhecidas.
+# Uso nativo: envsubst limitado às variáveis indicadas no README.
+map $host $mesa_app {
+    default customer;
+    ${ADMIN_DOMAIN} admin;
+    ${CUSTOMER_DOMAIN} customer;
+    ${WAITER_DOMAIN} waiter;
+    ${KITCHEN_DOMAIN} kitchen;
+}
+map $http_upgrade $mesa_connection { default upgrade; '' close; }
+map $http_x_forwarded_proto $mesa_proto { default $scheme; https https; }
+upstream mesa_api { server ${API_UPSTREAM}; }
+server { listen 80 default_server; server_name _; return 444; }
+server {
+    listen 80;
+    server_name ${ADMIN_DOMAIN} ${CUSTOMER_DOMAIN} ${WAITER_DOMAIN} ${KITCHEN_DOMAIN};
+    root /srv/mesa/$mesa_app;
+    client_max_body_size 3m;
+    add_header X-Content-Type-Options nosniff always;
+    add_header Referrer-Policy strict-origin-when-cross-origin always;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto $mesa_proto;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    # A superfície é definida pelo host, nunca pelo cabeçalho enviado pelo cliente.
+    proxy_set_header X-Mesa-App $mesa_app;
+    proxy_cache off;
+    location /api/ { proxy_pass http://mesa_api; }
+    location /health/ { proxy_pass http://mesa_api; }
+    location /socket.io/ {
+        proxy_pass http://mesa_api;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $mesa_connection;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $mesa_proto;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_read_timeout 75s;
+    }
+    location ^~ /assets/ {
+        try_files $uri =404;
+        add_header Cache-Control "public, max-age=31536000, immutable";
+    }
+    location = /sw.js {
+        try_files $uri =404;
+        add_header Cache-Control no-cache;
+        add_header Service-Worker-Allowed /;
+    }
+    location = /mesa-push-sw.js { try_files $uri =404; add_header Cache-Control no-cache; }
+    location = /mesa-boot.js { try_files $uri =404; add_header Cache-Control no-cache; }
+    location ^~ /pwa/ { proxy_pass http://mesa_api; }
+    location = / { try_files /index.html =404; add_header Cache-Control no-store; }
+    location ~ ^/(dashboard|salao|pedidos|producao|cardapio|pagamentos|caixa|financeiro|estoque|impressao|estacao-impressao|equipe|configuracoes|mesas|entregas|chamados|conferir-ficha|consumo|minhas-fichas|entrar|criar-conta|gestor)(/|$) {
+        try_files $uri /index.html;
+        add_header Cache-Control no-store;
+    }
+    # Slugs e instalações estáveis recebem o HTML identificado pela API.
+    location / { try_files $uri @mesa_pwa; }
+    location @mesa_pwa { proxy_pass http://mesa_api; }
+}

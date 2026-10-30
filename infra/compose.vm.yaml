@@ -1,0 +1,4 @@
+# VM com Nginx no host terminando HTTPS. Não usar no EasyPanel.
+services:
+  web:
+    ports: ['127.0.0.1:8080:80']

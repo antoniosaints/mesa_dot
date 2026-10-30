@@ -1,0 +1,24 @@
+[Unit]
+Description=Mesa worker
+After=network-online.target mysql.service redis-server.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=mesa
+Group=mesa
+WorkingDirectory=/opt/mesa
+ExecStart=/usr/local/bin/node --env-file=/etc/mesa/mesa.env /opt/mesa/dist/apps/worker/src/index.js
+Environment=NODE_ENV=production
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+KillSignal=SIGTERM
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

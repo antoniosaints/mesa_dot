@@ -1,0 +1,6 @@
+{
+  "name": "@bar/database",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts"
+}
