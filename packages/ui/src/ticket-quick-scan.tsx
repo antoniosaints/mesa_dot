@@ -5,6 +5,7 @@ import { Modal } from './common.js';
 import { Icon } from './appearance.js';
 import { api, session, type Data } from './client.js';
 import { canDeliverTicket } from './ticket-state.js';
+import { createTicketFrameReader } from './ticket-frame-reader.js';
 import {
   cameraErrorMessage,
   isCompleteTicketScan,
@@ -178,8 +179,7 @@ export function QuickScanDialog({
       return;
     }
     try {
-      const [{ BrowserMultiFormatReader }, { BarcodeFormat, DecodeHintType }, { default: jsQR }] =
-        await Promise.all([import('@zxing/browser'), import('@zxing/library'), import('jsqr')]);
+      const decodeFrame = await createTicketFrameReader();
       if (!active.current || run !== generation.current) return;
       const media = await navigator.mediaDevices.getUserMedia({
         audio: false,
@@ -194,8 +194,6 @@ export function QuickScanDialog({
         return;
       }
       stream.current = media;
-      const hints = new Map([[DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.CODE_128]]]);
-      const reader = new BrowserMultiFormatReader(hints);
       const preview = video.current!;
       preview.srcObject = media;
       await preview.play();
@@ -214,14 +212,7 @@ export function QuickScanDialog({
           }
           context.drawImage(preview, 0, 0, width, height);
           const pixels = context.getImageData(0, 0, width, height);
-          let value = jsQR(pixels.data, width, height, { inversionAttempts: 'attemptBoth' })?.data;
-          if (!value) {
-            try {
-              value = reader.decodeFromCanvas(canvas).getText();
-            } catch {
-              /* No barcode in this frame. */
-            }
-          }
+          const value = decodeFrame(canvas, pixels);
           if (value && cameraCode.current !== value) {
             cameraCode.current = value;
             void submitRef.current(value);

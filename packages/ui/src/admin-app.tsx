@@ -1,12 +1,12 @@
 import { DeleteTableButton } from './delete-table.js';
 import { ComplementsWorkspace } from './complements-workspace.js';
-import { AiAssistantProvider, AiSummaryButton } from './ai-assistant.js';
+import { AiAssistantProvider } from './ai-assistant.js';
 import { PushSettings } from './push-settings.js';
 import { PushDeviceButton } from './push-device.js';
 import { finishBranchTransition } from './branch-transition.js';
 import { ManagementShortcutProvider, ManagementShortcutBar } from './management-shortcuts.js';
 import { BranchSwitcher } from './branch-switcher.js';
-import { CustomerLinkPanel } from './customer-link-panel.js';
+import { DashboardOverview } from './dashboard-overview.js';
 import { OperationControl } from './operation-control.js';
 import { useSidebarPreference } from './sidebar-preference.js';
 import { CounterSaleModal } from './counter-sale.js';
@@ -29,22 +29,15 @@ import { useTicketDelivery } from './delivery.js';
 import { ClientRequestBanner, useClientRequestAlerts } from './request-alerts.js';
 import { ClientRequestList } from './request-center.js';
 import { canDeliverTicket } from './ticket-state.js';
-import {
-  OrderList,
-  OrdersWorkspace,
-  OrderSummary,
-  OrderDetailHeading,
-  shortId,
-} from './operations.js';
+import { OrdersWorkspace, OrderSummary, OrderDetailHeading, shortId } from './operations.js';
 import { adminPaths, usePageRoute, RouteNotFound } from './routing.js';
-import { SearchSelect, Tab, Tabs } from './controls.js';
+import { Tab, Tabs } from './controls.js';
 import { useFormDialog } from './forms.js';
 import { AppearanceSettings } from './appearance-settings.js';
 import { OperationSettings } from './operation-settings.js';
-import { businessAvailability } from '../../shared/src/business-hours.js';
 import { Clock, Icon, ThemeToggle, type IconName } from './appearance.js';
 import { useEffect, useLayoutEffect, useState } from 'react';
-import { api, brl, useStorageKey, session, saveSession, type Data } from './client.js';
+import { api, useStorageKey, session, saveSession, type Data } from './client.js';
 import {
   Badge,
   Login,
@@ -56,7 +49,7 @@ import {
   Code,
   Connectivity,
 } from './common.js';
-import { Floor, TablePanel, FloorEditor, FloorOverview } from './pos.js';
+import { TablePanel, FloorEditor, FloorOverview } from './pos.js';
 import { Resource } from './resource.js';
 import { ProductsWorkspace } from './products-workspace.js';
 const nav = [
@@ -81,8 +74,6 @@ export function AdminApp() {
   const [collapsed, setCollapsed] = useState<string[]>([]);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [counterOpen, setCounterOpen] = useState(false);
-  const [tableSearch, setTableSearch] = useState('');
-  const [tableStatus, setTableStatus] = useState('ALL');
 
   const can = (permission: string) => Boolean(current?.actor?.permissions.includes(permission));
   const pagePermissions: Record<string, string> = {
@@ -250,6 +241,9 @@ export function AdminApp() {
         page === 'team'
       )
         for (const path of relevant) if (path !== 'settings') relevant.delete(path);
+      if (page === 'overview')
+        for (const path of relevant)
+          if (!['dashboard', 'tables', 'service-requests'].includes(path)) relevant.delete(path);
       if (page === 'menu')
         for (const unused of ['dashboard', 'orders', 'product-variants', 'product-modifiers'])
           relevant.delete(unused);
@@ -584,9 +578,11 @@ export function AdminApp() {
                             )[page]
                       }
                       action={
-                        <button onClick={() => void load()} disabled={busy}>
-                          <Icon name="refresh" size={16} /> Recarregar
-                        </button>
+                        page !== 'overview' && (
+                          <button onClick={() => void load()} disabled={busy}>
+                            <Icon name="refresh" size={16} /> Recarregar
+                          </button>
+                        )
                       }
                     />
                   )}
@@ -599,169 +595,11 @@ export function AdminApp() {
                   <RouteNotFound onHome={() => setPage(visibleNav[0]?.[0] ?? 'overview')} />
                 )}
                 {page === 'overview' && (
-                  <>
-                    <div className="ai-page-actions">
-                      <AiSummaryButton>Resumir operação com IA</AiSummaryButton>
-                    </div>
-                    <div className="metrics">
-                      <Metric
-                        label="Mesas em atendimento"
-                        value={`${data.dashboard?.occupied ?? 0} / ${data.dashboard?.tables ?? 0}`}
-                        detail="O salão agora"
-                        icon="tables"
-                      />
-                      <Metric
-                        label="Saldo em aberto"
-                        value={brl(data.dashboard?.outstanding)}
-                        detail="Consumo aguardando recebimento"
-                        icon="payments"
-                      />
-                      <Metric
-                        label="Chamados abertos"
-                        value={String(data.dashboard?.service_requests ?? 0)}
-                        detail="Sua equipe em movimento"
-                        icon="team"
-                      />
-                      <Metric
-                        label="Impressões pendentes"
-                        value={String(data.dashboard?.pending_prints ?? 0)}
-                        detail="Fila de documentos"
-                        icon="printing"
-                      />
-                      <Metric
-                        label="Pedidos confirmados"
-                        value={String(
-                          list('orders').filter((o) => o.status === 'CONFIRMED').length,
-                        )}
-                        detail="pedidos registrados na unidade"
-                        icon="orders"
-                      />
-                      <Metric
-                        label="Produtos disponíveis"
-                        value={String(list('products').filter((p) => p.enabled).length)}
-                        detail="itens ativos no cardápio"
-                        icon="menu"
-                      />
-                    </div>
-                    <CustomerLinkPanel />
-                    <section className="panel dashboard-filters">
-                      <div>
-                        <h2>Salão</h2>
-                        <p className="muted small">
-                          Filtre as mesas para iniciar ou continuar um atendimento.
-                        </p>
-                      </div>
-                      <div className="filter-fields">
-                        <label>
-                          <span>Buscar mesa</span>
-                          <span className="input-icon">
-                            <Icon name="search" size={17} />
-                            <input
-                              aria-label="Buscar mesa"
-                              placeholder="Número da mesa"
-                              value={tableSearch}
-                              onChange={(e) => setTableSearch(e.target.value)}
-                            />
-                          </span>
-                        </label>
-                        <label>
-                          Situação
-                          <SearchSelect
-                            label={'Situação'}
-                            options={[
-                              { id: String('ALL'), name: 'Todas as mesas' },
-                              { id: String('FREE'), name: 'Livres' },
-                              { id: String('OCCUPIED'), name: 'Em atendimento' },
-                            ]}
-                            value={String(tableStatus ?? '')}
-                            onChange={(nextValue: string) => setTableStatus(nextValue)}
-                            allowClear={false}
-                          />
-                        </label>
-                      </div>
-                    </section>
-                    <div className="dashboard-grid">
-                      <section className="panel">
-                        <div className="section-head">
-                          <div>
-                            <h2>Mesas do estabelecimento</h2>
-                            <p className="muted small">Escolha uma mesa para atender.</p>
-                          </div>
-                          <div className="legend">
-                            <i className="green" /> Livre <i className="gold" /> Em atendimento
-                          </div>
-                        </div>
-                        <Floor
-                          tables={list('tables').filter(
-                            (t) =>
-                              t.number.toLowerCase().includes(tableSearch.toLowerCase()) &&
-                              (tableStatus === 'ALL' ||
-                                (tableStatus === 'FREE'
-                                  ? t.status === 'FREE'
-                                  : t.status !== 'FREE')),
-                          )}
-                          onSelect={setSelected}
-                        />
-                      </section>
-                      <section className="panel operation-panel">
-                        <div className="section-head">
-                          <h2>Atendimento</h2>
-                          <span className="online-dot" />
-                        </div>
-                        <p className="muted small">Situação atual do estabelecimento.</p>
-                        <div className="operation-summary">
-                          <span>Estabelecimento</span>
-                          <Badge
-                            status={
-                              businessAvailability({
-                                is_open: data.settings?.is_open,
-                                opening_hours: data.settings?.opening_hours,
-                              }).is_open
-                                ? 'AVAILABLE'
-                                : 'CLOSED'
-                            }
-                          />
-                        </div>
-                        <div className="operation-summary">
-                          <span>Mesas livres</span>
-                          <strong>
-                            {list('tables').filter((t) => t.status === 'FREE').length}
-                          </strong>
-                        </div>
-                        <div className="operation-summary">
-                          <span>Em atendimento</span>
-                          <strong>{data.dashboard?.occupied ?? 0}</strong>
-                        </div>
-                        <div className="operation-summary">
-                          <span>Chamados abertos</span>
-                          <strong>{data.dashboard?.service_requests ?? 0}</strong>
-                        </div>
-                        <button className="primary full" onClick={() => setPage('floor')}>
-                          <Icon name="tables" size={17} />
-                          Abrir salão{' '}
-                          <kbd className="management-keycap" aria-hidden="true">
-                            F2
-                          </kbd>
-                        </button>
-                        <button className="full" onClick={() => setPage('orders')}>
-                          <Icon name="orders" size={17} />
-                          Consultar pedidos
-                        </button>
-                      </section>
-                    </div>
-                    <section className="panel">
-                      <div className="section-head">
-                        <h2>Últimos pedidos</h2>
-                        <button className="text-button" onClick={() => setPage('orders')}>
-                          <Icon name="next" size={16} /> Ver todos
-                        </button>
-                      </div>
-                      <OrderList
-                        orders={list('orders').slice(0, 5)}
-                        onSelect={(o) => void showOrder(o)}
-                      />
-                    </section>
-                  </>
+                  <DashboardOverview
+                    key={scopeKey}
+                    scopeKey={scopeKey}
+                    onOpen={(path) => void navigate(path)}
+                  />
                 )}
                 {page === 'floor' && tableId && data.tables && !selected && (
                   <RouteNotFound onHome={() => setPage('floor')} />
@@ -1277,28 +1115,4 @@ export function AdminApp() {
   async function showOrder(o: Data) {
     void navigate(`/pedidos/${o.id}`);
   }
-}
-function Metric({
-  label,
-  value,
-  detail,
-  icon,
-}: {
-  label: string;
-  value: string;
-  detail: string;
-  icon: string;
-}) {
-  return (
-    <section className="metric">
-      <div className="metric-head">
-        <span>{label}</span>
-        <i>
-          <Icon name={icon as IconName} size={20} />
-        </i>
-      </div>
-      <strong>{value}</strong>
-      <small>{detail}</small>
-    </section>
-  );
 }

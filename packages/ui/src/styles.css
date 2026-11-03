@@ -2745,8 +2745,8 @@ textarea {
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
-  margin: 18px 0;
+  gap: 8px 12px;
+  margin: 12px 0;
 }
 .ticket-group-controls > p {
   max-width: 580px;
@@ -2758,15 +2758,16 @@ textarea {
   border: 1px solid var(--line);
   background: var(--input);
   border-radius: 8px;
-  margin-top: 12px;
+  margin-top: 8px;
   overflow: hidden;
 }
 .ticket-table-group > summary,
 .ticket-attendance-group > summary {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 18px;
+  gap: 8px;
+  padding: 10px 12px;
+  min-height: 44px;
   cursor: pointer;
   list-style: none;
 }
@@ -2774,15 +2775,18 @@ textarea {
   display: none;
 }
 .ticket-table-group summary > div {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 2px 12px;
   flex: 1;
   min-width: 0;
 }
 .ticket-table-group summary small {
-  display: block;
-  margin-top: 5px;
+  margin-top: 0;
   color: var(--muted);
   font-size: 10px;
-  line-height: 1.7;
+  line-height: 1.5;
 }
 .ticket-table-group > summary > svg:first-child,
 .ticket-attendance-group > summary > svg:first-child {
@@ -2797,10 +2801,10 @@ textarea {
   border-bottom: 1px solid var(--line);
 }
 .ticket-table-content {
-  padding: 0 18px 18px;
+  padding: 0 8px 8px;
 }
 .ticket-attendance-group {
-  margin-top: 14px;
+  margin-top: 8px;
   border: 1px solid var(--line);
   border-radius: 7px;
   background: var(--panel);
@@ -2809,26 +2813,40 @@ textarea {
   font-size: 12px;
 }
 .attendance-commandas {
-  padding: 0 16px 16px;
+  padding: 0 10px 10px;
 }
 .ticket-tab-group {
   border-top: 1px solid var(--line);
-  padding-top: 18px;
-  margin-top: 4px;
+  padding-top: 8px;
+  margin-top: 0;
+}
+.ticket-tab-group + .ticket-tab-group {
+  margin-top: 10px;
+}
+.ticket-tab-group > .section-head > div,
+.ticket-order-group > .section-head > div {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  min-width: 0;
 }
 .ticket-tab-group > .section-head h3 {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  font-size: 13px;
 }
-.ticket-tab-group > .section-head p {
-  margin-top: 6px;
+.ticket-tab-group > .section-head p,
+.ticket-order-group > .section-head p {
+  margin-top: 0;
+  font-size: 10px;
 }
 .ticket-order-group {
   border: 1px solid var(--line);
   border-radius: 6px;
-  padding: 14px;
-  margin-top: 14px;
+  padding: 8px;
+  margin-top: 8px;
   background: var(--input);
 }
 .ticket-order-group > .section-head {
@@ -2836,10 +2854,32 @@ textarea {
 }
 .ticket-order-group > .section-head button {
   font-size: 11px;
+  min-height: 32px;
+  padding: 5px 10px;
+  flex-shrink: 0;
+}
+.ticket-order-group .ticket-context-list {
+  gap: 6px;
+  margin-top: 8px;
 }
 .ticket-order-group .ticket-context-card {
   background: var(--panel);
-  padding: 13px;
+  padding: 8px 10px;
+  gap: 10px;
+}
+.ticket-order-group .ticket-context-icon {
+  width: 32px;
+  height: 32px;
+}
+.ticket-order-group .ticket-context-main p,
+.ticket-order-group .ticket-context-main small {
+  margin-top: 2px;
+  overflow-wrap: anywhere;
+}
+.ticket-order-group .ticket-context-card button {
+  min-height: 34px;
+  padding: 6px 10px;
+  font-size: 11px;
 }
 .ticket-delivery-action {
   display: flex;
@@ -2928,17 +2968,37 @@ textarea {
   }
   .ticket-table-group > summary,
   .ticket-attendance-group > summary {
-    padding: 13px;
+    padding: 8px 10px;
     flex-wrap: wrap;
   }
   .ticket-table-content {
-    padding: 0 9px 9px;
+    padding: 0 6px 6px;
   }
   .attendance-commandas {
-    padding: 0 9px 9px;
+    padding: 0 8px 8px;
   }
   .ticket-order-group {
-    padding: 10px;
+    padding: 6px;
+  }
+  .ticket-order-group .ticket-context-icon {
+    display: none;
+  }
+  .ticket-order-group .ticket-context-card > .button-row {
+    gap: 6px;
+  }
+  .ticket-order-group .ticket-context-card > .button-row > button,
+  .ticket-order-group .ticket-context-card > .button-row > .ticket-delivery-action {
+    flex: 1;
+  }
+  .ticket-order-group .ticket-context-card button {
+    min-height: 40px;
+  }
+  .ticket-order-group .ticket-context-main {
+    flex-basis: 100%;
+  }
+  .ticket-group-controls button {
+    flex: 1;
+    padding-inline: 8px;
   }
   .ticket-context-card > .button-row > .ticket-delivery-action {
     width: 100%;
@@ -11643,10 +11703,35 @@ button.catalog-switch[aria-checked='true'] > span {
   border: 1px solid var(--line);
   border-radius: 8px;
 }
+.team-detail-controls {
+  display: grid;
+  gap: 12px;
+  margin-top: 20px;
+}
+.team-detail-shortcuts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 10px;
+}
+.team-detail-controls button {
+  width: 100%;
+  min-height: 40px;
+  justify-content: center;
+}
 .team-detail-actions {
   display: grid;
   gap: 10px;
-  margin-top: 22px;
+}
+.staff-password-modal .notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 11px;
+  line-height: 1.7;
+}
+.staff-password-modal .notice > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
 }
 .team-detail-drawer .modal-footer {
   margin: 0;
@@ -15806,10 +15891,23 @@ body:has(.operation-control-modal) .toast-info {
 }
 .branch-option-icon {
   display: flex;
-  padding: 8px;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  overflow: hidden;
   background: var(--input);
   border: 1px solid var(--line);
   border-radius: 8px;
+}
+.branch-option-icon img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: inherit;
 }
 .branch-menu .branch-create {
   width: 100%;

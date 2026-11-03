@@ -1,6 +1,7 @@
 import { AccountUsers, UserBranches } from './account-users.js';
 import { Building2 } from 'lucide-react';
 import { StaffCredentials } from './staff-credentials.js';
+import { StaffPassword } from './staff-password.js';
 import { Copy } from 'lucide-react';
 import { Pagination, TableLoading } from './pagination.js';
 import { useEffect, useRef, useState } from 'react';
@@ -15,6 +16,7 @@ import {
   Power,
   AlertCircle,
   Check,
+  KeyRound,
 } from 'lucide-react';
 import { api, session, type Data } from './client.js';
 import { Icon } from './appearance.js';
@@ -44,6 +46,7 @@ export function TeamWorkspace() {
     [branchUserId, setBranchUserId] = useState('');
   const accountAdmin = Boolean(session()?.actor?.isAccountAdmin);
   const [credentials, setCredentials] = useState<{ member: Data; password?: string } | null>(null);
+  const [passwordMember, setPasswordMember] = useState<Data | null>(null);
   const [response, setResponse] = useState<Data | null>(null),
     [roles, setRoles] = useState<Data[]>([]);
   const [loading, setLoading] = useState(true),
@@ -584,34 +587,55 @@ export function TeamWorkspace() {
                 administração geral da conta.
               </p>
             </div>
-            {accountAdmin && (
-              <button onClick={() => setBranchUserId(detail.user_id)}>
-                <Building2 size={16} />
-                Definir filiais e perfis
-              </button>
-            )}
-            <button disabled={!detail.enabled} onClick={() => setCredentials({ member: detail })}>
-              <Copy size={16} />
-              Copiar credenciais
-            </button>
-            {!self(detail) && (
-              <div className="team-detail-actions">
-                <button onClick={() => editRole(detail)}>
-                  <Shield size={16} />
-                  Alterar perfil de acesso
-                </button>
+            <div className="team-detail-controls">
+              <div className="team-detail-shortcuts">
+                {accountAdmin && (
+                  <button onClick={() => setBranchUserId(detail.user_id)}>
+                    <Building2 size={16} />
+                    Definir filiais e perfis
+                  </button>
+                )}
                 <button
-                  className={detail.enabled ? 'team-disable' : 'team-enable'}
-                  onClick={() => {
-                    setConfirmId(detail.id);
-                    setActionError('');
-                  }}
+                  disabled={!detail.enabled}
+                  onClick={() => setCredentials({ member: detail })}
                 >
-                  <Power size={16} />
-                  {detail.enabled ? 'Desativar acesso' : 'Ativar acesso'}
+                  <Copy size={16} />
+                  Copiar credenciais
                 </button>
               </div>
-            )}
+              {!self(detail) && (
+                <div className="team-detail-actions">
+                  <button onClick={() => editRole(detail)}>
+                    <Shield size={16} />
+                    Alterar perfil de acesso
+                  </button>
+                  {accountAdmin && (
+                    <button
+                      disabled={!detail.enabled}
+                      title={
+                        !detail.enabled
+                          ? 'Ative o funcionário antes de alterar a senha.'
+                          : undefined
+                      }
+                      onClick={() => setPasswordMember(detail)}
+                    >
+                      <KeyRound size={16} />
+                      Alterar senha
+                    </button>
+                  )}
+                  <button
+                    className={detail.enabled ? 'team-disable' : 'team-enable'}
+                    onClick={() => {
+                      setConfirmId(detail.id);
+                      setActionError('');
+                    }}
+                  >
+                    <Power size={16} />
+                    {detail.enabled ? 'Desativar acesso' : 'Ativar acesso'}
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
           <div className="modal-footer">
             <ModalCloseButton>Fechar detalhes</ModalCloseButton>
@@ -671,6 +695,9 @@ export function TeamWorkspace() {
           initialPassword={credentials.password}
           onClose={() => setCredentials(null)}
         />
+      )}
+      {passwordMember && (
+        <StaffPassword member={passwordMember} onClose={() => setPasswordMember(null)} />
       )}
       {forms.dialog}
     </div>

@@ -11,20 +11,30 @@ import {
 import { changeStock } from './inventory.js';
 import { tabBalance } from './payments.js';
 import { lockCashUnit, selectOrderCash, setOrderCash } from './cash-sessions.js';
+import { isAccountAdmin } from './finance.js';
 export async function dashboard(s: Scope) {
   permit(s.actor, 'reports.view');
-  const tables = await s.list('dining_tables', sql`deleted_at IS NULL`);
-  const sessions = await s.list('table_sessions', sql`status<>'CLOSED'`);
+  const canTables = s.actor.permissions.includes('table.view');
+  const financial = await isAccountAdmin(s);
+  const tables = canTables
+    ? await s.list('dining_tables', sql`enabled=TRUE AND deleted_at IS NULL`)
+    : [];
+  const sessions = canTables ? await s.list('table_sessions', sql`status<>'CLOSED'`) : [];
   let outstanding = 0n;
-  for (const session of sessions)
-    for (const tab of await s.list('tabs', sql`session_id=${session.id}`))
-      outstanding += money((await tabBalance(s, tab.id)).balance);
+  if (financial)
+    for (const session of sessions)
+      for (const tab of await s.list('tabs', sql`session_id=${session.id}`))
+        outstanding += money((await tabBalance(s, tab.id)).balance);
   return {
     tables: tables.length,
     occupied: sessions.length,
-    outstanding: formatDecimal(outstanding),
-    service_requests: (await s.list('service_requests', sql`status IN ('OPEN','CLAIMED')`)).length,
-    pending_prints: (await s.list('print_jobs', sql`status IN ('PENDING','FAILED')`)).length,
+    outstanding: financial ? formatDecimal(outstanding) : null,
+    service_requests: s.actor.permissions.includes('ticket.redeem')
+      ? (await s.list('service_requests', sql`status IN ('OPEN','CLAIMED')`)).length
+      : null,
+    pending_prints: s.actor.permissions.includes('print.manage')
+      ? (await s.list('print_jobs', sql`status IN ('PENDING','FAILED')`)).length
+      : null,
   };
 }
 export async function inventoryAdjustment(

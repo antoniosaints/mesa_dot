@@ -8,6 +8,27 @@ import { Brand } from './appearance.js';
 import { Modal, ModalCloseButton, useRefresh } from './common.js';
 import { TableLoading } from './pagination.js';
 import { useToasts } from './toasts.js';
+function BranchImage({ branch }: { branch: Data }) {
+  const [failed, setFailed] = useState('');
+  const source = branch.icon_url;
+  return (
+    <span className="branch-option-icon">
+      {source && source !== failed ? (
+        <img
+          src={source}
+          alt=""
+          width={36}
+          height={36}
+          loading="lazy"
+          decoding="async"
+          onError={() => setFailed(source)}
+        />
+      ) : (
+        <Building2 size={17} />
+      )}
+    </span>
+  );
+}
 export function BranchSwitcher() {
   const [data, setData] = useState<Data | null>(null),
     [error, setError] = useState(''),
@@ -206,9 +227,7 @@ export function BranchSwitcher() {
                     disabled={Boolean(switching)}
                     onClick={() => void switchTo(branch).catch(() => {})}
                   >
-                    <span className="branch-option-icon">
-                      <Building2 size={17} />
-                    </span>
+                    <BranchImage branch={branch} />
                     <span>
                       <strong>{branch.name}</strong>
                       <small>

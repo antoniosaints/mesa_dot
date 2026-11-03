@@ -103,7 +103,7 @@ test('admin responsivo cadastra produto e atende pedido pós-pago', async ({ pag
   await page.setViewportSize({ width: 1440, height: 1000 });
   await login(page, 35173, email, true);
   await expect(page.getByRole('heading', { name: 'Dashboard', exact: true })).toBeVisible();
-  await expect(page.locator('.table-card')).toHaveCount(8);
+  await expect(page.locator('.overview-kpi')).toHaveCount(8);
   await page.screenshot({ path: 'docs/screenshots/admin-desktop.png', fullPage: true });
   await page.getByRole('button', { name: 'Cardápio', exact: true }).click();
   await page.getByRole('button', { name: 'Novo produto', exact: true }).click();
@@ -139,7 +139,7 @@ test('admin responsivo cadastra produto e atende pedido pós-pago', async ({ pag
     'aria-expanded',
     'false',
   );
-  await expect(page.locator('.table-card')).toHaveCount(8);
+  await expect(page.locator('.overview-kpi')).toHaveCount(8);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
   );

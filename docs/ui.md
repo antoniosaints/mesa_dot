@@ -89,6 +89,8 @@ Leitores USB/Bluetooth que funcionam como teclado usam o campo focado; o token c
 
 A opção Câmera solicita apenas vídeo, prefere a câmera traseira no celular e decodifica QR Code com [jsQR](https://github.com/cozmo/jsQR) e Code 128 com [ZXing](https://github.com/zxing-js/browser/tree/v0.1.5), carregados sob demanda. As imagens são processadas no navegador. Os tracks e o temporizador são encerrados ao parar, mudar para o leitor físico, fechar ou navegar, inclusive se a permissão responder depois de fechar a câmera. Falhas de permissão/dispositivo apresentam orientação para retomar pelo leitor físico. A câmera exige [contexto seguro: HTTPS ou localhost](https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getUserMedia).
 
+A tela **Conferir ficha** do garçom compartilha esse decodificador e funciona sem a API nativa opcional `BarcodeDetector`. Nessa tela, a leitura preenche o código e desliga a câmera; o garçom consulta a ficha e confirma a entrega separadamente. A permissão de câmera é solicitada para cada origem, incluindo portas diferentes do ambiente local.
+
 Os testes usam fichas de banco isolado e vídeo simulado com imagens efetivas de QR e Code 128, passando pelo decodificador real. Cobrem baixa e atualização do atendimento, repetição, código inválido, outra mesa, preparo pendente, permissão negada, parada dos tracks e cancelamento de inicialização. Os dispositivos físicos reais dependem do navegador, foco, permissão e qualidade de enquadramento.
 
 ## Financeiro da conta

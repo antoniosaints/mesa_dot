@@ -30,13 +30,16 @@ export function financeRange(start: string, end: string) {
   );
   return { from, until, previous: new Date(from.getTime() - days * 86400000), days };
 }
-export async function assertAccountAdmin(s: Scope) {
+export async function isAccountAdmin(s: Scope) {
   const members = await rows(
     s.tx,
     sql`SELECT tm.is_account_admin FROM tenant_memberships tm JOIN users u ON u.id=tm.user_id JOIN tenants t ON t.id=tm.tenant_id WHERE tm.tenant_id=${s.actor.tenantId} AND tm.user_id=${s.actor.id} AND tm.enabled=TRUE AND u.enabled=TRUE AND t.enabled=TRUE`,
   );
+  return s.actor.kind === 'STAFF' && Boolean(members[0]?.is_account_admin);
+}
+export async function assertAccountAdmin(s: Scope) {
   ensure(
-    s.actor.kind === 'STAFF' && members[0]?.is_account_admin,
+    await isAccountAdmin(s),
     'FORBIDDEN',
     'Financeiro restrito ao administrador geral da conta.',
     403,
@@ -69,7 +72,7 @@ async function context(s: Scope, raw: unknown) {
   };
 }
 // Every subquery is constrained to both tenant and establishment, including aggregates.
-function tabRows(s: Scope) {
+export function tabRows(s: Scope) {
   return sql`SELECT t.id,t.session_id,t.label name,t.status,t.created_at,IF(t.mode='COUNTER','COUNTER','TABLE') service_mode,d.number table_number,c.name customer_name,
     COALESCE(e.charges,0) charges,COALESCE(e.credits,0) credits,COALESCE(e.discounts,0) discounts,
     COALESCE(p.paid,0)-COALESCE(r.refunded,0) paid,
@@ -82,7 +85,7 @@ function tabRows(s: Scope) {
     LEFT JOIN (SELECT tab_id,SUM(amount) refunded FROM refunds WHERE ${s.where(sql`status='APPROVED'`)} GROUP BY tab_id) r ON r.tab_id=t.id
     WHERE t.tenant_id=${s.actor.tenantId} AND t.establishment_id=${s.actor.establishmentId}`;
 }
-async function periodTotals(s: Scope, from: Date, until: Date) {
+export async function periodTotals(s: Scope, from: Date, until: Date) {
   const [ledger, payments, refunds, attendances] = await Promise.all([
     rows(
       s.tx,

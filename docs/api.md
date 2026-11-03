@@ -13,7 +13,11 @@ Content-Type: application/json
 
 Retorna `token`, `refresh_token`, `expires_in`, `actor` e `name`. Use `Authorization: Bearer <token>`. `GET /me` devolve o ator autenticado. `POST /auth/refresh` recebe `refresh_token`, rotaciona ambas as credenciais e rejeita reutilização. `POST /auth/logout` revoga a sessão atual. Visitantes e agentes também usam Bearer, com capacidades distintas.
 
-## Idempotência
+## Visão geral da operação
+
+`GET /dashboard/overview?start=YYYY-MM-DD&end=YYYY-MM-DD` exige `reports.view`, com datas opcionais (padrão: hoje em Brasília) e intervalo de até 90 dias. Retorna `scope`, `period`, `access`, `availability`, `tables`, `orders`, `deliveries`, `requests`, `production`, `inventory`, `printing`, `cash`, `financial` e `generated_at`. Conta e filial são fixadas pela autenticação; não aceita filtros de conta/filial por query. Cada seção respeita a permissão da área e retorna `null` quando não autorizada. Financeiro exige administrador geral validado no banco, mesmo que o papel possua todas as permissões. O endpoint legado `/dashboard` também restringe o saldo agregado. Veja [semântica dos indicadores e matriz de acesso](visao-geral.md).
+
+## Idempotência nas mutações
 
 Envie `Idempotency-Key: <UUID>` em cada mutação autenticada. A mesma chave deve ser reutilizada em retries da mesma requisição. Nova ação exige nova chave. O hash inclui rota, parâmetros e corpo. Consulta por POST `/tickets/resolve` é somente leitura e não altera a ficha. Login, identificação pública e webhook possuem regras próprias de autenticação/idempotência.
 

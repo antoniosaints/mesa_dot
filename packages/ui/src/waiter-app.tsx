@@ -6,6 +6,8 @@ import { GroupedTickets } from './ticket-groups.js';
 import { ClientRequestBanner, useClientRequestAlerts } from './request-alerts.js';
 import { ClientRequestList, RequestDocumentDialog } from './request-center.js';
 import { canDeliverTicket } from './ticket-state.js';
+import { createTicketFrameReader } from './ticket-frame-reader.js';
+import { cameraErrorMessage, normalizeTicketScan } from './ticket-scan-code.js';
 import { usePageRoute, RouteNotFound } from './routing.js';
 import { AppHeader, Icon } from './appearance.js';
 import { useEffect, useRef, useState } from 'react';
@@ -57,6 +59,12 @@ export function WaiterApp() {
   const [ticket, setTicket] = useState<Data | null>(null);
   const video = useRef<HTMLVideoElement>(null);
   const stream = useRef<MediaStream | null>(null);
+  const cameraGeneration = useRef(0),
+    cameraTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined),
+    cameraStarting = useRef(false),
+    cameraMounted = useRef(true);
+  const [cameraState, setCameraState] = useState<'off' | 'starting' | 'active'>('off');
+  const [cameraError, setCameraError] = useState('');
   const { run, refresh, busy, feedback } = useAction();
   async function load() {
     if (!current) return;
@@ -90,42 +98,114 @@ export function WaiterApp() {
     calls,
   );
   useRefresh(load, [Boolean(current)]);
-  useEffect(
-    () => () => {
-      stream.current?.getTracks().forEach((t) => t.stop());
-    },
-    [],
-  );
-  async function stopCamera() {
+  function releaseCamera() {
+    cameraGeneration.current++;
+    cameraStarting.current = false;
+    clearTimeout(cameraTimer.current);
     stream.current?.getTracks().forEach((t) => t.stop());
     stream.current = null;
+    if (video.current) {
+      video.current.pause();
+      video.current.srcObject = null;
+    }
+  }
+  useEffect(() => {
+    cameraMounted.current = true;
+    return () => {
+      cameraMounted.current = false;
+      releaseCamera();
+    };
+  }, []);
+  useEffect(() => {
+    releaseCamera();
+    setCameraState('off');
+    setCameraError('');
+    setToken('');
+    setTicket(null);
+    return releaseCamera;
+  }, [page, scopeKey]);
+  function stopCamera() {
+    releaseCamera();
+    if (cameraMounted.current) setCameraState('off');
   }
   async function startCamera() {
-    await run(async () => {
-      const Detector = (window as any).BarcodeDetector;
-      if (!Detector)
-        throw new Error(
-          'Este navegador não suporta leitura por câmera. Use um leitor USB ou cole o código.',
-        );
-      await stopCamera();
-      stream.current = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' },
+    if (cameraStarting.current) return;
+    releaseCamera();
+    setCameraError('');
+    setTicket(null);
+    if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+      setCameraState('off');
+      setCameraError(
+        'A câmera exige HTTPS ou localhost. Abra o sistema por um endereço seguro ou use um leitor físico.',
+      );
+      return;
+    }
+    const generation = cameraGeneration.current;
+    cameraStarting.current = true;
+    setCameraState('starting');
+    try {
+      const decodeFrame = await createTicketFrameReader();
+      if (!cameraMounted.current || generation !== cameraGeneration.current) return;
+      const media = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
       });
-      if (video.current) {
-        video.current.srcObject = stream.current;
-        await video.current.play();
+      if (!cameraMounted.current || generation !== cameraGeneration.current || !video.current) {
+        media.getTracks().forEach((track) => track.stop());
+        return;
       }
-      const detector = new Detector({ formats: ['qr_code', 'code_128'] });
-      while (stream.current && video.current) {
-        const found = await detector.detect(video.current);
-        if (found.length) {
-          setToken(found[0].rawValue);
-          await stopCamera();
-          break;
+      stream.current = media;
+      const preview = video.current;
+      preview.srcObject = media;
+      await preview.play();
+      if (!cameraMounted.current || generation !== cameraGeneration.current) return;
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d', { willReadFrequently: true });
+      if (!context) throw new Error('Leitura de imagem indisponível.');
+      const fail = (problem: unknown) => {
+        if (cameraMounted.current && generation === cameraGeneration.current) {
+          stopCamera();
+          setCameraError(cameraErrorMessage(problem));
         }
-        await new Promise((r) => setTimeout(r, 250));
+      };
+      const loop = () => {
+        if (!cameraMounted.current || generation !== cameraGeneration.current) return;
+        try {
+          if (preview.readyState >= 2 && preview.videoWidth) {
+            const width = Math.min(1280, preview.videoWidth),
+              height = Math.max(1, Math.round((width * preview.videoHeight) / preview.videoWidth));
+            if (canvas.width !== width || canvas.height !== height) {
+              canvas.width = width;
+              canvas.height = height;
+            }
+            context.drawImage(preview, 0, 0, width, height);
+            const value = decodeFrame(canvas, context.getImageData(0, 0, width, height));
+            if (value) {
+              setToken(normalizeTicketScan(value));
+              setTicket(null);
+              stopCamera();
+              return;
+            }
+          }
+          cameraTimer.current = setTimeout(loop, 200);
+        } catch (problem) {
+          fail(problem);
+        }
+      };
+      setCameraState('active');
+      loop();
+    } catch (problem) {
+      if (cameraMounted.current && generation === cameraGeneration.current) {
+        stopCamera();
+        setCameraError(cameraErrorMessage(problem));
       }
-    });
+    } finally {
+      if (generation === cameraGeneration.current) cameraStarting.current = false;
+    }
   }
   if (!current || companySelectionRequested())
     return <Login onLogin={setCurrent} app="Atendimento e entrega" surface="waiter" />;
@@ -235,25 +315,59 @@ export function WaiterApp() {
             <p className="muted">
               Use a câmera, um leitor USB ou cole o código. A leitura apenas consulta a ficha.
             </p>
-            <video ref={video} playsInline muted className="scanner-video" />
+            <video
+              ref={video}
+              playsInline
+              muted
+              className="scanner-video"
+              aria-label="Prévia da câmera"
+            />
+            <p className="muted small" role="status">
+              {cameraState === 'starting'
+                ? 'Abrindo câmera…'
+                : cameraState === 'active'
+                  ? 'Enquadre o QR Code ou o código de barras da ficha.'
+                  : token
+                    ? 'Código preenchido. Consulte a ficha antes de confirmar a entrega.'
+                    : 'Use a câmera, um leitor físico ou digite o código abaixo.'}
+            </p>
+            {cameraError && (
+              <div className="alert error" role="alert">
+                {cameraError}
+              </div>
+            )}
             <div className="button-row">
-              <button onClick={() => void startCamera()}>Abrir câmera</button>
-              <button onClick={() => void stopCamera()}>Parar câmera</button>
+              <button disabled={busy || cameraState !== 'off'} onClick={() => void startCamera()}>
+                <Icon name="camera" size={16} />
+                {cameraState === 'starting' ? 'Abrindo câmera…' : 'Abrir câmera'}
+              </button>
+              <button disabled={cameraState === 'off'} onClick={stopCamera}>
+                <Icon name="close" size={16} />
+                Parar câmera
+              </button>
             </div>
             <form
               className="stack"
               onSubmit={(e) => {
                 e.preventDefault();
-                void run(async () =>
-                  setTicket(await api('/tickets/resolve', { token: token.trim() })),
-                );
+                stopCamera();
+                const generation = cameraGeneration.current;
+                void run(async () => {
+                  const resolved = await api('/tickets/resolve', {
+                    token: normalizeTicketScan(token),
+                  });
+                  if (cameraMounted.current && generation === cameraGeneration.current)
+                    setTicket(resolved);
+                });
               }}
             >
               <label>
                 Código da ficha
                 <input
                   value={token}
+                  disabled={busy}
                   onChange={(e) => {
+                    if (cameraState !== 'off') stopCamera();
                     setToken(e.target.value);
                     setTicket(null);
                   }}

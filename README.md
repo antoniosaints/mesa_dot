@@ -425,6 +425,7 @@ Como alternativa para térmicas de rede, cadastre uma impressora e seu setor na 
 
 - [Decisões de arquitetura e adaptação MySQL](docs/architecture.md)
 - [Contratos e exemplos de API](docs/api.md)
+- [Visão geral, indicadores e permissões por filial](docs/visao-geral.md)
 - [Operação, backup e recuperação](docs/operations.md)
 - [Aceite por fase e integrações externas](docs/acceptance.md)
 - [Padrão visual e temas](docs/ui.md)

@@ -1,4 +1,5 @@
 import { registerComplements } from './complements-routes.js';
+import { dashboardOverview } from './dashboard-overview.js';
 import { productPhotoSchema, saveProductPhoto, registerProductPhotos } from './product-photos.js';
 import {
   measurementUnitCodes,
@@ -418,6 +419,9 @@ export async function buildApp(options: { realtime?: boolean; logger?: boolean }
   );
   route('GET', '/finance/records', null, null, async (s, _b, req) => financeRecords(s, req.query));
   route('GET', '/dashboard', 'reports.view', null, async (s) => dashboard(s));
+  route('GET', '/dashboard/overview', 'reports.view', null, async (s, _b, req) =>
+    dashboardOverview(s, req.query),
+  );
   route('GET', '/push/context', null, null, (s) => ownPushContext(s));
   route('GET', '/push/settings', null, null, (s) => pushConfiguration(s));
   route('PATCH', '/push/settings', null, pushSettingsSchema, (s, b) => updatePushSettings(s, b));

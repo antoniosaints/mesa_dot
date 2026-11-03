@@ -189,6 +189,7 @@ export function GroupedTickets({
                             tickets={order.tickets}
                             onSelect={onSelect}
                             onDeliver={onDeliver}
+                            compact
                           />
                         </section>
                       ))}

@@ -27,10 +27,17 @@ export async function availableBranches(s: Scope) {
     current_id: s.actor.establishmentId,
     account_name: account.name,
     can_manage: Boolean(account.is_account_admin),
-    branches: await rows(
-      s.tx,
-      sql`SELECT e.id,e.name,e.slug,r.name role_name FROM establishments e JOIN staff_memberships m ON m.tenant_id=e.tenant_id AND m.establishment_id=e.id AND m.user_id=${s.actor.id} AND m.enabled=TRUE JOIN roles r ON r.tenant_id=m.tenant_id AND r.establishment_id=m.establishment_id AND r.id=m.role_id WHERE e.tenant_id=${s.actor.tenantId} ORDER BY e.name,e.id`,
-    ),
+    branches: (
+      await rows(
+        s.tx,
+        sql`SELECT e.id,e.name,e.slug,r.name role_name,p.icon_revision FROM establishments e JOIN staff_memberships m ON m.tenant_id=e.tenant_id AND m.establishment_id=e.id AND m.user_id=${s.actor.id} AND m.enabled=TRUE JOIN roles r ON r.tenant_id=m.tenant_id AND r.establishment_id=m.establishment_id AND r.id=m.role_id LEFT JOIN establishment_pwa_settings p ON p.tenant_id=e.tenant_id AND p.establishment_id=e.id WHERE e.tenant_id=${s.actor.tenantId} ORDER BY e.name,e.id`,
+      )
+    ).map((branch) => ({
+      ...branch,
+      icon_url: branch.icon_revision
+        ? `/pwa/assets/${branch.id}/${branch.icon_revision}/192.png`
+        : null,
+    })),
   };
 }
 export async function createBranch(s: Scope, name: string) {
