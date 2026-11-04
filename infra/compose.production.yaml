@@ -16,6 +16,7 @@ x-runtime: &runtime
   NODE_ENV: production
   API_HOST: 0.0.0.0
   API_PORT: '3000'
+  TRUSTED_PROXIES: ${TRUSTED_PROXIES:-loopback},${MESA_NETWORK_SUBNET:-172.30.50.0/24}
   DATABASE_URL: mysql://${MYSQL_USER:-mesa}:${MYSQL_PASSWORD:?Defina MYSQL_PASSWORD}@mysql:3306/${MYSQL_DATABASE:-mesa}
   REDIS_URL: redis://:${REDIS_PASSWORD:?Defina REDIS_PASSWORD}@redis:6379
   DOCUMENT_KEY: ${DOCUMENT_KEY:?Defina DOCUMENT_KEY}
@@ -136,3 +137,10 @@ services:
 volumes:
   mysql-data:
   redis-data:
+
+# Only this private application network and explicitly configured peers are trusted proxies.
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: ${MESA_NETWORK_SUBNET:-172.30.50.0/24}

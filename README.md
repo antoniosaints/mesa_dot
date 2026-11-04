@@ -50,7 +50,7 @@ A raiz da administração (`/`) apresenta a landing pública do Mesa. Use `/cria
 
 Na administração, abra uma mesa e expanda **QR Code da mesa para clientes**. O link usa o aplicativo cliente; em outro ambiente configure `VITE_CUSTOMER_URL` na construção do admin/garçom. Uma mesa ocupada exige código de participação, exibido aos participantes e funcionários autorizados. Identificar um cliente não ocupa a mesa. O link público sem mesa mostra o cardápio e permite ler uma mesa pela câmera ou fazer um pedido avulso para retirada no balcão, usando o pagamento antecipado existente.
 
-O modo de pagamento online é **sandbox**, claramente identificado. Somente a confirmação processada pelo backend libera o pedido. Não há cobrança real de Pix/cartão nesta entrega; a API bloqueia a criação de intents sandbox com `NODE_ENV=production`. Recebimentos manuais exigem permissão específica do funcionário.
+Pagamentos online usam **Mercado Pago** quando a filial está vinculada e ativa em Complementos. Sem conexão, o modo **sandbox** fica disponível apenas fora de produção e é claramente identificado. Somente a confirmação processada pelo backend libera o pedido; a API bloqueia intents sandbox com `NODE_ENV=production`. Recebimentos manuais exigem permissão específica do funcionário.
 
 Se 3000/5173 estiverem ocupadas, configure `API_PORT`, `API_PROXY_TARGET`, as portas Vite e `CORS_ORIGINS`. As portas dos testes de navegador são independentes: 33000 e 35173–35176.
 
@@ -73,6 +73,10 @@ O seletor no topo do menu lateral permite criar e trocar filiais. Em **Equipe �
 ## Atalhos da gestão
 
 Após o login, use **F1** para ler fichas, **F2** para mesas, **F3** para cardápio e **F4** para buscar funções. A barra fixa no rodapé mostra os atalhos com cores diferentes e permite acioná-los pelo mouse ou toque. Veja [o funcionamento e as regras de navegação](docs/atalhos-gestao.md).
+
+## Proxy e conciliação de pagamentos
+
+Configure os pares confiáveis em `TRUSTED_PROXIES` para que o rate limit diferencie clientes atrás do Nginx/EasyPanel. A migration `0029_gateway_operations.sql` e o worker habilitam operações Mercado Pago em fases, recuperação idempotente e conciliação automática por BullMQ. API e worker precisam ser atualizados juntos. Veja [configuração, limites e recuperação](docs/proxy-e-pagamentos.md).
 
 ## Complementos
 
@@ -306,6 +310,7 @@ Crie `/etc/mesa/mesa.env`, pertencente a `root:mesa`, modo `0640`, com as seguin
 ```dotenv
 NODE_ENV=production
 API_HOST=127.0.0.1
+TRUSTED_PROXIES=loopback
 API_PORT=3000
 DATABASE_URL=mysql://mesa:<senha_app>@127.0.0.1:3306/mesa
 REDIS_URL=redis://:<senha_redis>@127.0.0.1:6379
@@ -313,6 +318,12 @@ CORS_ORIGINS=https://mesa.userp.com.br,https://app.mesa.userp.com.br,https://gar
 CUSTOMER_PUBLIC_URL=https://app.mesa.userp.com.br
 DOCUMENT_KEY=<64_hex>
 PAYMENT_WEBHOOK_SECRET=<segredo_minimo_32_caracteres>
+# Para pagamentos reais; API e worker precisam das mesmas configurações.
+MERCADO_PAGO_CLIENT_ID=
+MERCADO_PAGO_CLIENT_SECRET=
+MERCADO_PAGO_REDIRECT_URI=https://mesa.userp.com.br/api/v1/complements/mercadopago/callback
+MERCADO_PAGO_WEBHOOK_SECRET=
+MERCADO_PAGO_TEST_MODE=false
 WEB_PUSH_PUBLIC_KEY=<chave_publica_vapid>
 WEB_PUSH_PRIVATE_KEY=<chave_privada_vapid>
 WEB_PUSH_SUBJECT=https://mesa.userp.com.br

@@ -20,6 +20,8 @@ export function NumericInput({
   min,
   max,
   prefix,
+  id,
+  describedBy,
 }: {
   label: string;
   value: string;
@@ -34,6 +36,8 @@ export function NumericInput({
   min?: string | number;
   max?: string | number;
   prefix?: string;
+  id?: string;
+  describedBy?: string;
 }) {
   const rules: NumericRules = {
     precision,
@@ -158,6 +162,7 @@ export function NumericInput({
   const input = (
     <input
       ref={element}
+      id={id}
       type="text"
       aria-label={label}
       inputMode={precision ? 'decimal' : 'numeric'}
@@ -166,7 +171,7 @@ export function NumericInput({
       placeholder={placeholder ?? (precision ? '0,' + '0'.repeat(precision) : '0')}
       defaultValue={initialDisplay}
       aria-invalid={error ? true : undefined}
-      aria-describedby={error ? errorId : undefined}
+      aria-describedby={[describedBy, error ? errorId : ''].filter(Boolean).join(' ') || undefined}
       onInvalid={() => setError(element.current!.validationMessage)}
       onFocus={() => {
         if (!rejected.current) {

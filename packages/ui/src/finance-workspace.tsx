@@ -1,4 +1,5 @@
 import { orderLocationLabel } from '../../shared/src/order-location.js';
+import { StatCard, LoadingSkeleton } from './data-display.js';
 import { Pagination, TableLoading } from './pagination.js';
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
@@ -511,6 +512,11 @@ export function FinanceWorkspace({ can }: { can: (permission: string) => boolean
               {[
                 ['Fundo de abertura', cash.opening_amount],
                 ['Vendas em dinheiro', cash.cash_sales],
+                ['Pix recebido', cash.pix_sales],
+                ['Cartão recebido', cash.card_sales],
+                ...(Number(cash.other_receipts)
+                  ? [['Outros recebimentos', cash.other_receipts]]
+                  : []),
                 ['Estornos em dinheiro', cash.refunds],
                 ['Sangrias', cash.withdrawals],
                 ['Suprimentos', cash.supplies],
@@ -521,12 +527,17 @@ export function FinanceWorkspace({ can }: { can: (permission: string) => boolean
                 </div>
               ))}
             </dl>
+            <div className="finance-cash-received">
+              <span>Recebido no turno (bruto)</span>
+              <strong>{brl(cash.received_gross)}</strong>
+            </div>
             <div className="finance-cash-total">
-              <span>Dinheiro esperado</span>
+              <span>Dinheiro físico esperado</span>
               <strong>{brl(cash.expected)}</strong>
             </div>
             <p className="field-hint">
-              Cartão e Pix entram nos recebimentos, sem compor o dinheiro físico.
+              Totais do turno selecionado. Pix e cartão são registrados no caixa, mas não aumentam o
+              dinheiro físico na gaveta.
             </p>
             {canCash && (
               <>
@@ -735,24 +746,23 @@ export function FinanceWorkspace({ can }: { can: (permission: string) => boolean
         aria-busy={loading}
       >
         {!s && !summaryError ? (
-          <div className="finance-skeleton" role="status">
-            Carregando indicadores financeiros…
+          <div className="finance-skeleton">
+            <LoadingSkeleton label="Carregando indicadores financeiros…" rows={4} />
           </div>
         ) : (
           s && (
             <>
               <div className="finance-kpis">
                 {kpis.map(([label, value, hint, icon, tone]) => (
-                  <section key={label} className="panel finance-kpi">
-                    <span className={`finance-kpi-icon ${tone}`}>
-                      <Icon name={icon} size={23} />
-                    </span>
-                    <div>
-                      <span>{label}</span>
-                      <strong>{value}</strong>
-                      <small>{hint}</small>
-                    </div>
-                  </section>
+                  <StatCard
+                    key={label}
+                    className="panel finance-kpi"
+                    iconClassName={`finance-kpi-icon ${tone}`}
+                    label={label}
+                    value={value}
+                    detail={hint}
+                    icon={<Icon name={icon} size={23} />}
+                  />
                 ))}
               </div>
               <div className="finance-reconciliation panel" aria-label="Composição do faturamento">
@@ -1014,7 +1024,11 @@ export function FinanceWorkspace({ can }: { can: (permission: string) => boolean
                     ) : (
                       <>
                         <div className="finance-table-wrap">
-                          <table>
+                          <table
+                            className="mobile-card-table"
+                            role="table"
+                            aria-label="Registros financeiros"
+                          >
                             <thead>
                               <tr>
                                 {columns[kind].map((col) => (

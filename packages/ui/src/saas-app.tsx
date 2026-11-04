@@ -380,7 +380,10 @@ function Accounts() {
           <TableLoading label="Carregando contas…" />
         ) : (
           <div className="mesa-root-scroll">
-            <table className="mesa-root-table mesa-root-account-table">
+            <table
+              className="mesa-root-table mesa-root-account-table mobile-card-table"
+              role="table"
+            >
               <thead>
                 <tr>
                   <th>Conta / administrador</th>
@@ -880,7 +883,7 @@ function Plans() {
           <TableLoading />
         ) : (
           <div className="mesa-root-scroll">
-            <table className="mesa-root-table">
+            <table className="mesa-root-table mobile-card-table" role="table">
               <thead>
                 <tr>
                   <th>Plano</th>
@@ -891,11 +894,11 @@ function Plans() {
               <tbody>
                 {paginate(data, page, size).rows.map((p) => (
                   <tr key={p.id}>
-                    <td>
+                    <td data-label="Plano">
                       <strong>{p.name}</strong>
                     </td>
-                    <td>{brl(p.monthly_price)}</td>
-                    <td>{date(p.created_at)}</td>
+                    <td data-label="Mensalidade">{brl(p.monthly_price)}</td>
+                    <td data-label="Cadastro">{date(p.created_at)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -1043,7 +1046,7 @@ function Audit() {
           <TableLoading />
         ) : (
           <div className="mesa-root-scroll">
-            <table className="mesa-root-table">
+            <table className="mesa-root-table mobile-card-table" role="table">
               <thead>
                 <tr>
                   <th>Data e hora</th>
@@ -1055,15 +1058,15 @@ function Audit() {
               <tbody>
                 {paginate(data, page, size).rows.map((row) => (
                   <tr key={row.id}>
-                    <td>{date(row.created_at, true)}</td>
-                    <td>
+                    <td data-label="Data e hora">{date(row.created_at, true)}</td>
+                    <td data-label="Ação">
                       <strong>{auditNames[row.action] ?? row.action}</strong>
                       <small>{row.action}</small>
                     </td>
-                    <td>
+                    <td data-label="Registro">
                       <strong>{row.target_name ?? row.aggregate_id}</strong>
                     </td>
-                    <td>
+                    <td data-label="Responsável">
                       <strong>{row.actor_name ?? row.actor_id}</strong>
                     </td>
                   </tr>

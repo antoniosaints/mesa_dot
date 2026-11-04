@@ -1,3 +1,4 @@
+import { expectMobileModalLayout } from './modal-layout.js';
 import { test } from './test.js';
 import { expect } from '@playwright/test';
 import { PNG } from 'pngjs';
@@ -30,7 +31,8 @@ test('cadastra, amplia, troca e remove fotos preservando a edição e o layout m
   await page.getByRole('button', { name: 'Entrar na operação' }).click();
   await page.getByRole('button', { name: 'Novo produto', exact: true }).click();
   const create = page.getByRole('dialog', { name: 'Adicionar · Produtos', exact: true });
-  const name = 'Produto fotografado ' + suffix;
+  const name =
+    'Produto fotografado com nome extenso para o cardápio ' + suffix + '-' + 'X'.repeat(48);
   await create.getByLabel('Nome', { exact: true }).fill(name);
   await create.getByLabel('Selecionar foto do produto').setInputFiles({
     name: 'invalido.svg',
@@ -53,6 +55,9 @@ test('cadastra, amplia, troca e remove fotos preservando a edição e o layout m
   await create.getByRole('button', { name: 'Ampliar foto do produto' }).click();
   const preview = page.getByRole('dialog', { name: 'Foto · ' + name, exact: true });
   await expect(preview.getByRole('img')).toBeVisible();
+  await page.setViewportSize({ width: 320, height: 900 });
+  await expectMobileModalLayout(preview);
+  await preview.screenshot({ path: '.local/screenshots/modal-photo-long-title-mobile.png' });
   expect(
     await request
       .get('http://127.0.0.1:33000/api/v1/public/' + fixture.slug + '/menu')
@@ -60,6 +65,7 @@ test('cadastra, amplia, troca e remove fotos preservando a edição e o layout m
       .then((menu) => menu.products.some((p: any) => p.name === name)),
   ).toBe(false);
   await preview.getByRole('button', { name: 'Fechar foto', exact: true }).click();
+  await page.setViewportSize({ width: 1440, height: 1000 });
   await create.getByRole('tab', { name: 'Preços e variações', exact: true }).click();
   await create.getByLabel('Preço', { exact: true }).fill('12');
   const saved = page.waitForResponse(
@@ -102,6 +108,7 @@ test('cadastra, amplia, troca e remove fotos preservando a edição e o layout m
   await customerCard.click();
   const customerDetail = customer.getByRole('dialog', { name, exact: true });
   await expect(customerDetail.locator('.customer-product-photo img')).toBeVisible();
+  await expectMobileModalLayout(customerDetail);
   await customer.screenshot({ path: '.local/screenshots/product-photo-customer-mobile.png' });
   await customer.close();
   await page.getByRole('button', { name: 'Editar ' + name, exact: true }).click();
@@ -118,6 +125,7 @@ test('cadastra, amplia, troca e remove fotos preservando a edição e o layout m
     expect(await editor.evaluate((element) => element.scrollWidth <= element.clientWidth + 1)).toBe(
       true,
     );
+    await expectMobileModalLayout(editor);
     await page.screenshot({
       path: '.local/screenshots/product-photo-editor-mobile-' + theme + '.png',
     });

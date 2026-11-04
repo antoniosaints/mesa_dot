@@ -47,6 +47,11 @@ export function tenantPwa(surface: PwaSurface): Plugin {
             ? '/api/v1/pwa/apps/' + entry!.value
             : '/api/v1/pwa/resolve/' + entry!.value;
         const response = await fetch(api + endpoint, {
+          headers: {
+            'X-Forwarded-For': [req.headers['x-forwarded-for'], req.socket.remoteAddress]
+              .filter(Boolean)
+              .join(', '),
+          },
           signal: AbortSignal.timeout(10000),
           redirect: 'error',
         });

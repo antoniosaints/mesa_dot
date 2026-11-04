@@ -1,0 +1,84 @@
+/* Segmented tabs for management pages and portals. Current UI and PWAs keep
+   their existing tabs; routing, selection and keyboard handlers stay in place. */
+:is(.mesa-erp, .mesa-erp-surface) .system-tabs[role='tablist'],
+.mesa-erp .orders-results > .tabs-group > .system-tabs {
+  align-items: stretch;
+  gap: 3px;
+  width: fit-content;
+  max-width: 100%;
+  min-width: 0;
+  padding: 3px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface-subtle);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-padding-inline: 4px;
+}
+:is(.mesa-erp, .mesa-erp-surface) .system-tabs[role='tablist'] > [role='tab'] {
+  flex: 1 0 auto;
+  min-height: 40px;
+  padding: 6px 12px;
+  gap: 6px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  box-shadow: none;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+  scroll-margin-inline: 4px;
+}
+:is(.mesa-erp, .mesa-erp-surface) .system-tabs[role='tablist'] > [role='tab']:hover:not(:disabled) {
+  background: var(--color-surface);
+  color: var(--color-text);
+  border-color: var(--color-border);
+}
+:is(.mesa-erp, .mesa-erp-surface)
+  .system-tabs[role='tablist']
+  > [role='tab']:is([aria-selected='true'], [aria-current='page'], .active),
+:is(.mesa-erp, .mesa-erp-surface)
+  .system-tabs[role='tablist']
+  > [role='tab']:is([aria-selected='true'], [aria-current='page'], .active):hover {
+  background: var(--color-brand);
+  color: var(--color-on-brand);
+  border-color: var(--color-brand);
+  box-shadow:
+    inset 0 1px 0 #ffffff30,
+    0 1px 3px #0002;
+}
+:is(.mesa-erp, .mesa-erp-surface)
+  .system-tabs[role='tablist']
+  > [role='tab'][aria-selected='true']
+  > :is(.system-tab-count, .client-request-count) {
+  color: var(--color-brand-ink);
+  background: var(--color-surface);
+  border-color: transparent;
+}
+:is(.mesa-erp, .mesa-erp-surface)
+  .system-tabs[role='tablist']
+  > [role='tab']
+  > :is(.system-tab-count, .client-request-count) {
+  min-width: 20px;
+  flex-shrink: 0;
+  border-radius: 6px;
+  font-size: 11px;
+  line-height: 1.4;
+  text-align: center;
+}
+:is(.mesa-erp, .mesa-erp-surface) .system-tabs[role='tablist'] > [role='tab']:focus-visible {
+  outline: 2px solid var(--color-brand-ink);
+  outline-offset: -4px;
+}
+:is(.mesa-erp, .mesa-erp-surface)
+  .system-tabs[role='tablist']
+  > [role='tab'][aria-selected='true']:focus-visible {
+  outline-color: var(--color-on-brand);
+}
+@media (max-width: 700px) {
+  :is(.mesa-erp, .mesa-erp-surface) .system-tabs[role='tablist'] > [role='tab'] {
+    min-height: 44px;
+  }
+}

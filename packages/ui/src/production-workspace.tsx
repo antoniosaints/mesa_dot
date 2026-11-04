@@ -180,16 +180,15 @@ export function ProductionWorkspace() {
             tone: 'neutral',
           },
         ].map((k) => (
-          <section key={k.label} className={'panel production-kpi ' + k.tone}>
-            <span className="production-kpi-icon">
-              <k.icon size={21} />
-            </span>
-            <div>
-              <span>{k.label}</span>
-              <strong>{jobs ? k.value : '—'}</strong>
-              <small>{k.hint}</small>
-            </div>
-          </section>
+          <StatCard
+            key={k.label}
+            className={'panel production-kpi ' + k.tone}
+            iconClassName="production-kpi-icon"
+            label={k.label}
+            value={jobs ? k.value : '—'}
+            detail={k.hint}
+            icon={<k.icon size={21} />}
+          />
         ))}
       </div>
       <section className="panel production-filter-panel">
@@ -444,3 +443,4 @@ export function ProductionWorkspace() {
     </div>
   );
 }
+import { StatCard } from './data-display.js';

@@ -1,3 +1,4 @@
+import { expectMobileModalLayout } from './modal-layout.js';
 import { test } from './test.js';
 import { expect, type Page, type APIRequestContext } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
@@ -163,6 +164,7 @@ test('protege alterações só no perfil e valida telefone e CEP antes de salvar
     await page.evaluate((theme) => (document.documentElement.dataset.theme = theme), theme);
     for (const width of [1440, 390, 320]) {
       await page.setViewportSize({ width, height: 900 });
+      await expectMobileModalLayout(modal);
       expect(await modal.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(
         true,
       );
@@ -170,6 +172,7 @@ test('protege alterações só no perfil e valida telefone e CEP antes de salvar
   }
   expect((await savedSettings(request)).business_profile).toEqual(before);
   await modal.getByRole('button', { name: 'Cancelar', exact: true }).click();
+  await expectMobileModalLayout(guard);
   await guard.getByRole('button', { name: 'Descartar alterações', exact: true }).click();
   await expect(modal).toHaveCount(0);
 });
@@ -285,6 +288,7 @@ test('valida horários compartilhados e protege preenchimento não salvo em mobi
     for (const width of [390, 320]) {
       await page.setViewportSize({ width, height: 844 });
       await batch.scrollIntoViewIfNeeded();
+      await expectMobileModalLayout(modal);
       expect(await modal.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(
         true,
       );

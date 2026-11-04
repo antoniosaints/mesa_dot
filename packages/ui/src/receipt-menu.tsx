@@ -1,4 +1,5 @@
 import { useId, useLayoutEffect, useRef, useState } from 'react';
+import { useInterfaceSurface } from './interface-scope.js';
 import { createPortal } from 'react-dom';
 import { ChevronDown, FileText, Printer } from 'lucide-react';
 import { session } from './client.js';
@@ -6,6 +7,7 @@ import { shortId } from './operation-format.js';
 import { ReceiptDialog, ReceiptPdfDialog } from './receipt-button.js';
 
 export function ReceiptMenuButton({ scope, id }: { scope: 'ORDER' | 'TAB'; id: string }) {
+  const interfaceSurface = useInterfaceSurface();
   const [open, setOpen] = useState(false);
   const [dialog, setDialog] = useState<'PDF' | 'THERMAL' | null>(null);
   const [position, setPosition] = useState({ left: 0, top: 0 });
@@ -79,7 +81,7 @@ export function ReceiptMenuButton({ scope, id }: { scope: 'ORDER' | 'TAB'; id: s
           <div
             ref={menu}
             id={menuId}
-            className="receipt-action-menu"
+            className={['receipt-action-menu', interfaceSurface].filter(Boolean).join(' ')}
             role="menu"
             aria-label={label}
             style={position}

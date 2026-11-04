@@ -1,4 +1,6 @@
 import { ShieldCheck } from 'lucide-react';
+import { useInterfaceSurface } from './interface-scope.js';
+import { EmptyState, StatusBadge } from './data-display.js';
 import { CompanySelection } from './company-selection.js';
 export { CompanySelection } from './company-selection.js';
 import { iconPath, type PwaSurface } from '../../shared/src/pwa.js';
@@ -20,25 +22,10 @@ import {
 import QRCode from 'qrcode';
 import bwipjs from 'bwip-js/browser';
 import { Brand, Icon, ThemeToggle } from './appearance.js';
-import {
-  api,
-  saveSession,
-  saveLoginSession,
-  session,
-  statusLabel,
-  subscribe,
-  type Data,
-} from './client.js';
-export function Badge({ status }: { status: string }) {
-  return <span className={`badge ${status.toLowerCase()}`}>{statusLabel[status] ?? status}</span>;
-}
+import { api, saveSession, saveLoginSession, session, subscribe, type Data } from './client.js';
+export const Badge = StatusBadge;
 export function Empty({ children = 'Nenhum registro por aqui.' }: { children?: ReactNode }) {
-  return (
-    <div className="empty">
-      <Icon name="inventory" size={30} />
-      <p>{children}</p>
-    </div>
-  );
+  return <EmptyState>{children}</EmptyState>;
 }
 const modalStack: {
   id: string;
@@ -95,6 +82,7 @@ export function Modal({
   role = 'dialog',
   routeBound = false,
   focusClose = false,
+  size,
 }: {
   title: string;
   heading?: ReactNode;
@@ -106,7 +94,9 @@ export function Modal({
   role?: 'dialog' | 'alertdialog';
   routeBound?: boolean;
   focusClose?: boolean;
+  size?: 'confirm' | 'form' | 'detail' | 'wide';
 }) {
+  const interfaceSurface = useInterfaceSurface();
   const panel = useRef<HTMLElement>(null);
   const [headerTarget, setHeaderTarget] = useState<HTMLDivElement | null>(null);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
@@ -229,7 +219,7 @@ export function Modal({
   return createPortal(
     <ModalContext.Provider value={{ requestClose, setDirty, headerTarget }}>
       <div
-        className="overlay"
+        className={['overlay', interfaceSurface].filter(Boolean).join(' ')}
         onPointerDownCapture={(event) => {
           backdropPress.current =
             event.button === 0
@@ -262,14 +252,15 @@ export function Modal({
           role={role}
           aria-modal="true"
           aria-label={title}
+          data-size={size}
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="section-head">
-            <h2>{heading ?? title}</h2>
+          <div className="section-head modal-header">
+            <h2 className="modal-title">{heading ?? title}</h2>
             <div className="modal-header-actions" ref={setHeaderTarget} />
             <button
               type="button"
-              className="icon-button"
+              className="icon-button modal-header-close"
               data-modal-autofocus={focusClose || undefined}
               disabled={closeDisabled}
               onClick={requestClose}
@@ -282,7 +273,12 @@ export function Modal({
         </section>
       </div>
       {confirmDiscard && (
-        <Modal title="Descartar alterações?" role="alertdialog" onClose={continueEditing}>
+        <Modal
+          title="Descartar alterações?"
+          size="confirm"
+          role="alertdialog"
+          onClose={continueEditing}
+        >
           <p className="modal-description">
             Você tem alterações não salvas. Se sair agora, os dados preenchidos serão perdidos.
           </p>
@@ -341,7 +337,7 @@ export function useAction() {
       setBusy(running.current > 0);
     }
   }
-  return { run, refresh, busy, error, notice, feedback: null };
+  return { run, refresh, busy, error, notice, feedback: null, clearError: () => setError('') };
 }
 export function useRefresh(load: () => Promise<void>, deps: unknown[] = []) {
   const callback = useRef(load);

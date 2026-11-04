@@ -630,3 +630,203 @@ describe('Chat e ações de IA', () => {
     ).toBe(409);
   });
 });
+
+it('não mantém o lock da filial enquanto o checkout aguarda o Mercado Pago', async () => {
+  const order = await call(
+    'POST',
+    '/orders',
+    {
+      table_id: fixture.tables[0].id,
+      source: 'CUSTOMER',
+      payment_policy: 'PREPAID',
+      items: [{ product_id: fixture.products[0].id, quantity: 1, modifiers: [] }],
+    },
+    visitorToken,
+  );
+  const count = fake.calls.filter((c) => c.url.pathname === '/checkout/preferences').length;
+  const release = fake.pauseMercado('/checkout/preferences');
+  const pending = request('POST', '/payments/intents', { order_id: order.id }, visitorToken);
+  try {
+    await expect
+      .poll(() => fake.calls.filter((c) => c.url.pathname === '/checkout/preferences').length)
+      .toBe(count + 1);
+    const other = await Promise.race([
+      request('POST', '/categories', {
+        name: 'Operação durante checkout ' + randomUUID().slice(0, 5),
+      }),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Unit lock held during provider call')), 1500),
+      ),
+    ]);
+    expect(other.statusCode, other.body).toBe(200);
+  } finally {
+    release();
+  }
+  expect((await pending).statusCode).toBe(200);
+});
+
+it('recupera checkout aceito após timeout sem criar outra preferência e preserva a chave idempotente', async () => {
+  const order = await call(
+    'POST',
+    '/orders',
+    {
+      table_id: fixture.tables[0].id,
+      source: 'CUSTOMER',
+      payment_policy: 'PREPAID',
+      items: [{ product_id: fixture.products[0].id, quantity: 1, modifiers: [] }],
+    },
+    visitorToken,
+  );
+  const key = randomUUID();
+  fake.failNextPreferenceAfterApply();
+  expect(
+    (
+      await request('POST', '/payments/intents', { order_id: order.id }, visitorToken, {
+        'Idempotency-Key': key,
+      })
+    ).statusCode,
+  ).toBe(409);
+  const intent = (await view(fixture.actor).list('payment_intents', sql`order_id=${order.id}`))[0];
+  const operation = (
+    await view(fixture.actor).list(
+      'gateway_operations',
+      sql`kind='CHECKOUT' AND source_id=${intent.id}`,
+    )
+  )[0];
+  expect(operation.state).toBe('PENDING');
+  expect(operation.payload.provider_started_at).toBeTruthy();
+  const { finishMercadoOperation } = await import('../../apps/api/src/mercado-financial.js');
+  await finishMercadoOperation(fixture.actor, operation.id);
+  const repeat = await request('POST', '/payments/intents', { order_id: order.id }, visitorToken, {
+    'Idempotency-Key': key,
+  });
+  expect(repeat.statusCode, repeat.body).toBe(200);
+  expect(repeat.json().id).toBe(intent.id);
+  expect(repeat.json().checkout_url).toMatch(/^https:\/\//);
+  expect(
+    fake.calls.filter(
+      (c) =>
+        c.url.pathname === '/checkout/preferences' &&
+        c.body?.external_reference === intent.provider_reference,
+    ),
+  ).toHaveLength(1);
+  expect(await view(fixture.actor).list('payment_intents', sql`order_id=${order.id}`)).toHaveLength(
+    1,
+  );
+  const remote = [...fake.payments.values()].find(
+    (payment) => payment.external_reference === intent.provider_reference,
+  )!;
+  remote.status = 'approved';
+  expect((await webhook(remote)).statusCode).toBe(200);
+  expect(
+    (
+      await request('POST', '/payments/intents', { order_id: order.id }, visitorToken, {
+        'Idempotency-Key': key,
+      })
+    ).json(),
+  ).toEqual(repeat.json());
+});
+
+it('mantém o estorno reservado após timeout, bloqueia entrega e concilia webhook concorrente sem duplicar', async () => {
+  const { order, intent, remote } = await prepaid();
+  remote.status = 'approved';
+  const paid = await webhook(remote);
+  expect(paid.statusCode, paid.body).toBe(200);
+  const detail = await call('GET', '/orders/' + order.id),
+    payment = paid.json().payment;
+  const input = { amount: '1.00', tab_id: detail.tab_id, reason: 'Estorno com recuperação' },
+    key = randomUUID();
+  const before = fake.refunds.size;
+  fake.failNextRefundAfterApply();
+  expect(
+    (
+      await request('POST', '/payments/' + payment.id + '/refund', input, token, {
+        'Idempotency-Key': key,
+      })
+    ).statusCode,
+  ).toBe(409);
+  const document = await call('GET', '/tickets/' + detail.tickets[0].id);
+  const blocked = await request('POST', '/tickets/' + document.id + '/redeem', {
+    token: document.token,
+  });
+  expect(blocked.statusCode).toBe(409);
+  expect(blocked.body).toContain('estorno aguardando');
+  expect(
+    (await call('GET', '/tables/' + fixture.tables[0].id + '/closing-review')).issues.join(' '),
+  ).toContain('Estorno aguardando');
+  expect(
+    (await request('POST', '/payments/' + payment.id + '/refund', { ...input, amount: '2.00' }))
+      .statusCode,
+  ).toBe(409);
+  // The webhook can observe the remote result before the HTTP retry receives its ACK.
+  expect((await webhook(remote)).statusCode).toBe(200);
+  const repeated = await request(
+    'POST',
+    '/payments/' + payment.id + '/refund',
+    { ...input, reason: 'Retomar estorno já autorizado' },
+    staffToken,
+  );
+  expect(repeated.statusCode, repeated.body).toBe(200);
+  expect(repeated.json().reason).toBe(input.reason);
+  expect(fake.refunds.size).toBe(before + 1);
+  const refunds = await view(fixture.actor).list('refunds', sql`payment_id=${payment.id}`);
+  expect(refunds).toHaveLength(1);
+  expect(refunds[0].created_by).toBe(fixture.actor.id);
+  expect(
+    (await call('GET', '/payments')).find((row: any) => row.id === payment.id).review_reason,
+  ).toBeNull();
+  expect(
+    (
+      await request('POST', '/payments/' + payment.id + '/refund', input, token, {
+        'Idempotency-Key': key,
+      })
+    ).json().id,
+  ).toBe(refunds[0].id);
+  expect((await view(fixture.actor).list('payment_intents', sql`id=${intent.id}`))[0].status).toBe(
+    'APPROVED',
+  );
+});
+
+it('o worker recupera pagamento sem webhook com retry BullMQ e reaplica sem emitir fichas em dobro', async () => {
+  const { intent, order, remote } = await prepaid();
+  remote.status = 'approved';
+  const { Redis } = await import('ioredis');
+  const { startPaymentReconciliation } =
+    await import('../../apps/worker/src/payment-reconciliation.js');
+  const redis = new Redis(env.REDIS_URL, { maxRetriesPerRequest: null });
+  const service = startPaymentReconciliation(redis, 'mercado-payments-test-' + randomUUID());
+  try {
+    const record = (
+      await view(fixture.actor).list('payment_reconciliation', sql`intent_id=${intent.id}`)
+    )[0];
+    fake.failNextPaymentSearch();
+    const job = await service.queue.add(
+      'reconciliation',
+      { ...record, kind: 'reconciliation' },
+      { attempts: 3, backoff: { type: 'fixed', delay: 50 } },
+    );
+    await expect
+      .poll(async () => (await call('GET', '/orders/' + order.id)).status, { timeout: 15000 })
+      .toBe('CONFIRMED');
+    await expect.poll(() => job.getState()).toBe('completed');
+    expect((await service.queue.getJob(job.id!))!.attemptsMade).toBeGreaterThan(1);
+    expect((await call('GET', '/orders/' + order.id)).tickets).toHaveLength(1);
+    expect((await webhook(remote)).statusCode).toBe(200);
+    await service.queue.add('reconciliation', { ...record, kind: 'reconciliation' });
+    await expect
+      .poll(
+        async () => (await view(fixture.actor).get('payment_reconciliation', record.id)).attempts,
+      )
+      .toBe(0);
+    expect(await view(fixture.actor).list('payments', sql`intent_id=${intent.id}`)).toHaveLength(1);
+    expect((await call('GET', '/orders/' + order.id)).tickets).toHaveLength(1);
+    expect(
+      (await view(fixture.actor).get('payment_reconciliation', record.id)).last_error,
+    ).toBeNull();
+  } finally {
+    await service.worker.close();
+    await service.queue.obliterate({ force: true });
+    await service.queue.close();
+    await redis.quit();
+  }
+});

@@ -6,6 +6,7 @@ import { createRoot } from 'react-dom/client';
 import { AdminEntry } from '../../../packages/ui/src/mesa-site.js';
 import '../../../packages/ui/src/styles.css';
 import '../../../packages/ui/src/mesa-site.css';
+import '../../../packages/ui/src/erp-theme.css';
 createRoot(document.getElementById('root')!).render(
   <ToastProvider>
     <AppearanceSync />

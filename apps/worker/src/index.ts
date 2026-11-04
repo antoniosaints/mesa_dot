@@ -1,3 +1,4 @@
+import { startPaymentReconciliation } from './payment-reconciliation.js';
 import { stagePushEvent, startPushQueue, cleanupPushSubscriptions } from './push-notifications.js';
 import { Queue, Worker } from 'bullmq';
 import { Redis } from 'ioredis';
@@ -18,6 +19,7 @@ import { approvedForOrder } from '../../api/src/payments.js';
 const redis = new Redis(env.REDIS_URL, { maxRetriesPerRequest: null });
 const queue = new Queue('outbox', { connection: redis });
 const push = startPushQueue(redis);
+const payments = startPaymentReconciliation(redis);
 async function sessionFor(event: Row) {
   const s = view(publicActor({ id: event.establishment_id, tenant_id: event.tenant_id }));
   const session = await s.list('table_sessions', sql`id=${event.aggregate_id}`);
@@ -164,6 +166,7 @@ const stop = async () => {
   stopped = true;
   await worker.close();
   await push.close();
+  await payments.close();
   await queue.close();
   await redis.quit();
   await pool.end();
@@ -176,6 +179,7 @@ while (!stopped) {
   try {
     await dispatch();
     await push.dispatch();
+    await payments.dispatch();
     if (Date.now() - lastMaintenance >= 60_000) await cleanupPushSubscriptions();
     await maintenance();
   } catch (error) {

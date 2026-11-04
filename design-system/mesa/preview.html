@@ -1,0 +1,1813 @@
+<!doctype html>
+<html lang="pt-BR" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Mesa · Proposta de design system</title>
+    <style>
+      @font-face {
+        font-family: Sora;
+        src: url('../../packages/ui/src/fonts/Sora-Variable.ttf') format('truetype');
+        font-weight: 100 800;
+        font-display: swap;
+      }
+      :root {
+        color-scheme: light;
+        font-family: Sora, sans-serif;
+        font-size: 14px;
+        font-weight: 500;
+        --bg: #f5f7fb;
+        --surface: #fff;
+        --subtle: #f8fafc;
+        --text: #17243b;
+        --muted: #52637a;
+        --border: #dce4ef;
+        --control: #7a899d;
+        --brand: #0757f9;
+        --on-brand: #fff;
+        --ink: #0757f9;
+        --soft: #eaf0ff;
+        --green: #06734f;
+        --green-bg: #dff7ec;
+        --amber: #805400;
+        --amber-bg: #fff3cf;
+        --shadow: 0 18px 60px #10203026;
+        --sidebar-width: 248px;
+      }
+      [data-theme='dark'] {
+        color-scheme: dark;
+        --bg: #090e1a;
+        --surface: #0e1525;
+        --subtle: #131e32;
+        --text: #e2e8f0;
+        --muted: #a8b6ca;
+        --border: #27364c;
+        --control: #677990;
+        --ink: #6fa8ff;
+        --soft: #172d51;
+        --green: #5ee6b3;
+        --green-bg: #10372d;
+        --amber: #fcd980;
+        --amber-bg: #352b14;
+        --shadow: 0 18px 60px #0008;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        line-height: 1.5;
+      }
+      button,
+      input,
+      select {
+        font: inherit;
+        font-weight: 600;
+      }
+      button,
+      .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        min-height: 40px;
+        padding: 8px 12px;
+        border: 1px solid var(--control);
+        border-radius: 8px;
+        color: var(--text);
+        background: var(--surface);
+        cursor: pointer;
+        text-decoration: none;
+        font-size: 13px;
+      }
+      button:hover,
+      .button:hover {
+        background: var(--subtle);
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      button:focus-visible,
+      a:focus-visible,
+      input:focus-visible,
+      select:focus-visible,
+      summary:focus-visible {
+        outline: 3px solid var(--ink);
+        outline-offset: 3px;
+      }
+      .primary {
+        background: var(--brand);
+        border-color: var(--brand);
+        color: var(--on-brand);
+      }
+      .primary:hover {
+        background: #0648d4;
+      }
+      svg {
+        width: 18px;
+        height: 18px;
+        flex-shrink: 0;
+      }
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+      h1 {
+        font-size: 27px;
+        font-weight: 700;
+        letter-spacing: -0.8px;
+        line-height: 1.3;
+      }
+      h2 {
+        font-size: 16px;
+        font-weight: 700;
+      }
+      h3 {
+        font-size: 14px;
+        font-weight: 600;
+      }
+      small,
+      .muted {
+        color: var(--muted);
+      }
+      small {
+        font-size: 12px;
+      }
+      .numeric {
+        font-variant-numeric: tabular-nums;
+      }
+      .skip {
+        position: fixed;
+        top: -80px;
+        left: 16px;
+        z-index: 100;
+      }
+      .skip:focus {
+        top: 10px;
+      }
+      .sidebar {
+        width: var(--sidebar-width);
+        height: 100dvh;
+        position: fixed;
+        inset: 0 auto 0 0;
+        background: #0d1b2a;
+        color: #e2e8f0;
+        display: flex;
+        flex-direction: column;
+        padding: 24px 16px;
+        z-index: 20;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin: 0 8px 30px;
+      }
+      .brand-symbol {
+        display: grid;
+        place-items: center;
+        width: 40px;
+        height: 40px;
+        border-radius: 12px;
+        color: #fff;
+        background: #0757f9;
+      }
+      .brand-symbol svg {
+        width: 24px;
+        height: 24px;
+      }
+      .brand strong {
+        display: block;
+        font-size: 22px;
+        letter-spacing: -0.7px;
+      }
+      .brand small {
+        color: #b0c0d3;
+        font-size: 12px;
+      }
+      .unit {
+        background: #162a3d;
+        padding: 12px;
+        border: 1px solid #41536a;
+        border-radius: 10px;
+        margin-bottom: 24px;
+      }
+      .unit strong {
+        display: block;
+        font-size: 13px;
+      }
+      .unit small {
+        color: #b0c0d3;
+      }
+      nav {
+        display: grid;
+        gap: 6px;
+      }
+      nav > span {
+        padding: 20px 12px 5px;
+        color: #b0c0d3;
+        font-size: 12px;
+      }
+      nav a {
+        min-height: 42px;
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        padding: 10px 12px;
+        border-radius: 8px;
+        color: #d4deeb;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 13px;
+      }
+      nav a:hover {
+        background: #1a3046;
+      }
+      nav a[aria-current] {
+        color: #fff;
+        background: #0757f9;
+      }
+      nav a small {
+        margin-left: auto;
+        color: inherit;
+        border: 1px solid #ffffff55;
+        padding: 0 4px;
+        border-radius: 4px;
+      }
+      .sidebar-bottom {
+        margin-top: auto;
+        padding: 18px 12px 0;
+        border-top: 1px solid #41536a;
+      }
+      .sidebar-bottom small {
+        color: #b0c0d3;
+        display: block;
+        margin-top: 4px;
+      }
+      .app {
+        margin-left: var(--sidebar-width);
+        min-width: 0;
+      }
+      .topbar {
+        min-height: 72px;
+        padding: 12px 28px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        background: var(--surface);
+        border-bottom: 1px solid var(--border);
+      }
+      .topbar-heading,
+      .actions {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        min-width: 0;
+      }
+      .topbar-heading p {
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .icon-button {
+        width: 40px;
+        padding: 8px;
+      }
+      .avatar {
+        display: grid;
+        place-items: center;
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: var(--soft);
+        color: var(--ink);
+        font-weight: 700;
+        font-size: 12px;
+      }
+      main {
+        max-width: 1600px;
+        margin: auto;
+        padding: 28px;
+        display: grid;
+        gap: 24px;
+      }
+      .page-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+      }
+      .page-header p {
+        color: var(--muted);
+        margin-top: 8px;
+      }
+      .eyebrow {
+        display: block;
+        margin-bottom: 8px;
+        color: var(--ink);
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .notice {
+        background: var(--soft);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 10px 14px;
+        color: var(--ink);
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        font-size: 12px;
+      }
+      .notice a {
+        color: inherit;
+        font-weight: 700;
+        margin-left: auto;
+      }
+      .kpis {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 16px;
+      }
+      .stat,
+      .panel {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        min-width: 0;
+      }
+      .stat {
+        padding: 16px;
+        display: grid;
+        gap: 12px;
+      }
+      .stat-head {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .stat-icon {
+        display: grid;
+        place-items: center;
+        width: 34px;
+        height: 34px;
+        background: var(--soft);
+        color: var(--ink);
+        border-radius: 9px;
+        flex-shrink: 0;
+      }
+      .stat strong {
+        font-size: clamp(23px, 2vw, 28px);
+        letter-spacing: -0.8px;
+        line-height: 1.3;
+      }
+      .stat small {
+        display: block;
+      }
+      .positive {
+        color: var(--green);
+      }
+      .charts {
+        display: grid;
+        grid-template-columns: minmax(0, 1.7fr) minmax(260px, 1fr);
+        gap: 16px;
+      }
+      .panel-head {
+        padding: 18px 20px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        border-bottom: 1px solid var(--border);
+      }
+      .panel-head p {
+        margin-top: 3px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .panel-body {
+        padding: 20px;
+      }
+      .chart-label {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 16px;
+      }
+      .chart-label strong {
+        font-size: 20px;
+      }
+      .bar-chart {
+        height: 154px;
+        display: grid;
+        grid-template-columns: repeat(12, minmax(0, 1fr));
+        gap: 10px;
+        align-items: end;
+        border-bottom: 1px solid var(--border);
+        background: repeating-linear-gradient(to top, transparent 0 37px, var(--border) 37px 38px);
+      }
+      .bar-chart span {
+        display: block;
+        height: var(--value);
+        background: var(--ink);
+        border-radius: 4px 4px 0 0;
+        min-width: 0;
+      }
+      .axis {
+        display: grid;
+        grid-template-columns: repeat(12, minmax(0, 1fr));
+        gap: 10px;
+        margin-top: 10px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .axis span:nth-child(2) {
+        grid-column: 4;
+      }
+      .axis span:nth-child(3) {
+        grid-column: 7;
+      }
+      .axis span:nth-child(4) {
+        grid-column: 10;
+      }
+      .axis span:last-child {
+        grid-column: 12;
+        text-align: right;
+      }
+      details {
+        margin-top: 16px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      summary {
+        cursor: pointer;
+      }
+      .occupancy {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+        padding-block: 18px;
+      }
+      .ring {
+        width: 132px;
+        height: 132px;
+        border-radius: 50%;
+        background: conic-gradient(var(--ink) 0 58%, var(--border) 58% 100%);
+        padding: 12px;
+        flex-shrink: 0;
+      }
+      .ring div {
+        border-radius: 50%;
+        height: 100%;
+        background: var(--surface);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+      }
+      .ring strong {
+        font-size: 26px;
+      }
+      .legend {
+        flex: 1;
+        display: grid;
+        gap: 14px;
+        min-width: 0;
+      }
+      .legend div {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+      }
+      .legend b {
+        margin-left: auto;
+      }
+      .dot {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--ink);
+        flex-shrink: 0;
+      }
+      .dot.free {
+        background: var(--green);
+      }
+      .dot.pending {
+        background: var(--amber);
+      }
+      .tabs {
+        display: flex;
+        padding-inline: 20px;
+        border-bottom: 1px solid var(--border);
+        overflow-x: auto;
+      }
+      .tabs a {
+        padding: 12px 14px;
+        color: var(--ink);
+        background: var(--soft);
+        border-bottom: 2px solid var(--brand);
+        font-size: 13px;
+        font-weight: 600;
+        text-decoration: none;
+        display: inline-flex;
+        gap: 8px;
+        align-items: center;
+      }
+      .count {
+        padding: 0 5px;
+        border-radius: 4px;
+        background: var(--surface);
+        font-size: 12px;
+      }
+      .table-tools {
+        display: flex;
+        gap: 12px;
+        padding: 16px 20px;
+        flex-wrap: wrap;
+      }
+      .search {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        border: 1px solid var(--control);
+        border-radius: 8px;
+        padding: 0 12px;
+        flex: 1 1 240px;
+        color: var(--muted);
+        min-width: 0;
+      }
+      input,
+      select {
+        min-height: 40px;
+        min-width: 0;
+        max-width: 100%;
+        color: var(--text);
+        background: var(--surface);
+        border: 1px solid var(--control);
+        border-radius: 8px;
+        padding: 8px 12px;
+        font-size: 13px;
+      }
+      .search input {
+        width: 100%;
+        border: 0;
+        background: transparent;
+        padding-inline: 0;
+      }
+      input::placeholder {
+        color: var(--muted);
+        opacity: 1;
+      }
+      .filter {
+        display: grid;
+        gap: 4px;
+      }
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      th,
+      td {
+        padding: 10px 20px;
+        text-align: left;
+        border-bottom: 1px solid var(--border);
+      }
+      th {
+        background: var(--subtle);
+        font-size: 12px;
+        color: var(--muted);
+        font-weight: 600;
+      }
+      th button {
+        padding: 0;
+        min-height: 28px;
+        background: none;
+        border: 0;
+        color: inherit;
+        font-size: inherit;
+      }
+      td small {
+        display: block;
+        margin-top: 2px;
+      }
+      td strong {
+        font-weight: 600;
+      }
+      td:last-child,
+      th:last-child,
+      .align-right {
+        text-align: right;
+      }
+      tbody tr:hover {
+        background: var(--subtle);
+      }
+      td button {
+        min-height: 34px;
+        font-size: 12px;
+        padding: 6px 10px;
+      }
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        background: var(--green-bg);
+        color: var(--green);
+        border-radius: 6px;
+        padding: 4px 7px;
+        font-size: 12px;
+        font-weight: 600;
+        white-space: nowrap;
+      }
+      .badge svg {
+        width: 13px;
+        height: 13px;
+      }
+      .badge.pending {
+        color: var(--amber);
+        background: var(--amber-bg);
+      }
+      .pagination {
+        padding: 14px 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+      .pagination button {
+        width: 34px;
+        min-height: 34px;
+        padding: 6px;
+      }
+      .pagination .current {
+        background: var(--soft);
+        color: var(--ink);
+        border-color: var(--ink);
+      }
+      .tokens {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+      }
+      .token {
+        padding: 12px;
+        background: var(--subtle);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        min-width: 0;
+      }
+      .token > i {
+        display: block;
+        height: 30px;
+        border-radius: 5px;
+        margin-bottom: 10px;
+        background: var(--swatch);
+        border: 1px solid var(--control);
+      }
+      .token strong {
+        display: block;
+        font-size: 12px;
+      }
+      .token small {
+        font-size: 12px;
+      }
+      .bottom-note {
+        display: flex;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 12px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      dialog {
+        width: min(620px, calc(100% - 24px));
+        max-height: calc(100dvh - 32px);
+        overflow-y: auto;
+        background: var(--surface);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 0;
+        box-shadow: var(--shadow);
+      }
+      dialog::backdrop {
+        background: #050c1bb3;
+      }
+      .modal-heading {
+        padding: 20px;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 40px;
+        gap: 16px;
+        border-bottom: 1px solid var(--border);
+      }
+      .modal-heading h2 {
+        overflow-wrap: anywhere;
+      }
+      .modal-heading p {
+        font-size: 12px;
+        margin-top: 4px;
+        color: var(--muted);
+      }
+      .modal-body {
+        display: grid;
+        gap: 20px;
+        padding: 20px;
+      }
+      .modal-facts {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+      .modal-facts > div {
+        padding: 12px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+      }
+      .modal-facts strong {
+        display: block;
+        margin-top: 6px;
+      }
+      .modal-body label {
+        display: grid;
+        gap: 8px;
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .modal-footer {
+        padding: 16px 20px;
+        border-top: 1px solid var(--border);
+        display: flex;
+        justify-content: flex-end;
+      }
+      .compact {
+        --sidebar-width: 76px;
+      }
+      .compact .sidebar {
+        padding-inline: 12px;
+      }
+      .compact .sidebar .copy,
+      .compact .unit,
+      .compact nav > span,
+      .compact .sidebar-bottom,
+      .compact nav a small {
+        display: none;
+      }
+      .compact .brand {
+        margin: 0 0 30px;
+        justify-content: center;
+      }
+      .compact nav a {
+        justify-content: center;
+      }
+      .backdrop {
+        display: none;
+      }
+      @media (max-width: 1200px) {
+        .kpis {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .charts {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+      @media (max-width: 900px) {
+        .app {
+          margin-left: 0;
+        }
+        .sidebar {
+          display: none;
+          width: 248px;
+        }
+        body.menu-open .sidebar {
+          display: flex;
+        }
+        body.menu-open .backdrop {
+          display: block;
+          position: fixed;
+          inset: 0;
+          border: 0;
+          border-radius: 0;
+          background: #050c1bb3;
+          z-index: 19;
+        }
+        .topbar {
+          padding-inline: 16px;
+        }
+        main {
+          padding: 20px 16px;
+        }
+      }
+      @media (max-width: 700px) {
+        h1 {
+          font-size: 24px;
+        }
+        .page-header {
+          align-items: start;
+          flex-direction: column;
+        }
+        .page-header .actions {
+          width: 100%;
+        }
+        .page-header .button {
+          flex: 1;
+        }
+        .topbar .topbar-heading strong {
+          font-size: 13px;
+        }
+        .topbar .avatar {
+          display: none;
+        }
+        .topbar {
+          gap: 8px;
+        }
+        .topbar .actions {
+          gap: 6px;
+        }
+        .notice {
+          flex-wrap: wrap;
+        }
+        .notice a {
+          margin-left: 28px;
+        }
+        .kpis {
+          gap: 12px;
+        }
+        .stat {
+          padding: 12px;
+        }
+        .stat-head {
+          flex-direction: column;
+          align-items: start;
+        }
+        .occupancy {
+          gap: 16px;
+        }
+        .ring {
+          width: 108px;
+          height: 108px;
+        }
+        .panel-head,
+        .panel-body {
+          padding: 16px;
+        }
+        .table-tools {
+          padding: 16px;
+        }
+        .table-tools .filter {
+          flex: 1 1 100%;
+        }
+        input,
+        select {
+          font-size: 16px;
+        }
+        button,
+        .button,
+        .icon-button,
+        .pagination button,
+        td button,
+        select,
+        input {
+          min-height: 44px;
+        }
+        .icon-button {
+          width: 44px;
+        }
+        table,
+        tbody {
+          display: block;
+        }
+        thead {
+          position: absolute;
+          width: 1px;
+          height: 1px;
+          overflow: hidden;
+          clip-path: inset(50%);
+        }
+        tbody {
+          padding: 0 16px;
+        }
+        tr {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+          border: 1px solid var(--border);
+          border-radius: 8px;
+          padding: 12px;
+          margin-bottom: 12px;
+          gap: 12px;
+        }
+        td {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+          min-width: 0;
+          border: 0;
+          padding: 0;
+          overflow-wrap: anywhere;
+        }
+        td::before {
+          content: attr(data-label);
+          font-size: 12px;
+          color: var(--muted);
+          margin-bottom: 4px;
+        }
+        td:last-child {
+          grid-column: 1 / -1;
+          border-top: 1px solid var(--border);
+          padding-top: 12px;
+        }
+        td:last-child::before {
+          display: none;
+        }
+        td button {
+          width: 100%;
+        }
+        .pagination {
+          padding: 4px 16px 16px;
+        }
+        .pagination .actions {
+          gap: 6px;
+        }
+        .tokens {
+          grid-template-columns: 1fr 1fr;
+        }
+        .tabs {
+          padding-inline: 16px;
+        }
+        .bar-chart {
+          gap: 6px;
+        }
+        .modal-heading {
+          grid-template-columns: minmax(0, 1fr) 44px;
+        }
+        .modal-footer button {
+          width: 100%;
+        }
+      }
+      @media (prefers-reduced-motion: no-preference) {
+        button,
+        a {
+          transition:
+            background-color 150ms ease,
+            color 150ms ease;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <a class="skip button" href="#conteudo">Pular para o conteúdo</a>
+    <button class="backdrop" aria-label="Fechar menu" hidden></button>
+    <aside class="sidebar" aria-label="Menu lateral">
+      <div class="brand">
+        <span class="brand-symbol"
+          ><svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            class="lucide lucide-panels-top-left lucide-layout"
+            aria-hidden="true"
+          >
+            <rect width="18" height="18" x="3" y="3" rx="2"></rect>
+            <path d="M3 9h18"></path>
+            <path d="M9 21V9"></path></svg
+        ></span>
+        <div class="copy"><strong>mesa.</strong><small>Gestão de restaurantes</small></div>
+      </div>
+      <div class="unit">
+        <strong>Restaurante demonstração</strong><small>Filial Centro · ambiente de prévia</small>
+      </div>
+      <nav aria-label="Navegação da prévia">
+        <a href="#conteudo" aria-current="page" title="Visão geral"
+          ><svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            class="lucide lucide-gauge"
+            aria-hidden="true"
+          >
+            <path d="m12 14 4-4"></path>
+            <path d="M3.34 19a10 10 0 1 1 17.32 0"></path></svg
+          ><span class="copy">Visão geral</span></a
+        >
+        <span>OPERAÇÃO</span>
+        <a href="#pedidos" title="Pedidos"
+          ><svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            class="lucide lucide-clipboard-list"
+            aria-hidden="true"
+          >
+            <rect width="8" height="4" x="8" y="2" rx="1" ry="1"></rect>
+            <path
+              d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"
+            ></path>
+            <path d="M12 11h4"></path>
+            <path d="M12 16h4"></path>
+            <path d="M8 11h.01"></path>
+            <path d="M8 16h.01"></path></svg
+          ><span class="copy">Pedidos</span><small>4</small></a
+        >
+        <a href="#graficos" title="Indicadores"
+          ><svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            class="lucide lucide-chart-no-axes-combined"
+            aria-hidden="true"
+          >
+            <path d="M12 16v5"></path>
+            <path d="M16 14.639V21"></path>
+            <path d="M20 10.656V21"></path>
+            <path d="m22 3-8.646 8.646a.5.5 0 0 1-.708 0L9.354 8.354a.5.5 0 0 0-.707 0L2 15"></path>
+            <path d="M4 18.463V21"></path>
+            <path d="M8 14.656V21"></path></svg
+          ><span class="copy">Indicadores</span></a
+        >
+        <span>DESIGN SYSTEM</span>
+        <a href="#componentes" title="Componentes"
+          ><svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            class="lucide lucide-panels-top-left lucide-layout"
+            aria-hidden="true"
+          >
+            <rect width="18" height="18" x="3" y="3" rx="2"></rect>
+            <path d="M3 9h18"></path>
+            <path d="M9 21V9"></path></svg
+          ><span class="copy">Componentes e cores</span></a
+        >
+        <a href="MASTER.md" title="Proposta completa"
+          ><svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            class="lucide lucide-book-open"
+            aria-hidden="true"
+          >
+            <path d="M12 5v16"></path>
+            <path
+              d="M20.001 19A2 2 0 0022 17V5a2 2 0 00-1.999-2L16 3.002A5 5 0 0012 5a5 5 0 00-4-2H4a2 2 0 00-2 2v12a2 2 0 001.999 2H8a5 5 0 014 2 5 5 0 014-2z"
+            ></path></svg
+          ><span class="copy">Proposta completa</span></a
+        >
+      </nav>
+      <div class="sidebar-bottom">
+        <strong>Administrador</strong><small>Prévia visual · sem dados reais</small>
+      </div>
+    </aside>
+    <div class="app">
+      <header class="topbar">
+        <div class="topbar-heading">
+          <button
+            id="menu"
+            class="icon-button"
+            aria-label="Alternar menu lateral"
+            aria-controls="menu-lateral"
+            aria-expanded="true"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              class="lucide lucide-panel-left lucide-sidebar"
+              aria-hidden="true"
+            >
+              <rect width="18" height="18" x="3" y="3" rx="2"></rect>
+              <path d="M9 3v18"></path>
+            </svg>
+          </button>
+          <div>
+            <p>Restaurante demonstração / Centro</p>
+            <strong>Visão geral</strong>
+          </div>
+        </div>
+        <div class="actions">
+          <button id="theme" class="icon-button" aria-label="Ativar tema escuro">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              class="lucide lucide-moon"
+              aria-hidden="true"
+            >
+              <path
+                d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"
+              ></path>
+            </svg></button
+          ><span class="avatar" aria-label="Administrador">AD</span>
+        </div>
+      </header>
+      <main id="conteudo" tabindex="-1">
+        <div class="page-header">
+          <div>
+            <span class="eyebrow">PAINEL DA FILIAL</span>
+            <h1>Sua operação, em um só lugar.</h1>
+            <p>Acompanhe o movimento e o que precisa de atenção.</p>
+          </div>
+          <div class="actions">
+            <a class="button primary" href="#pedidos"
+              ><svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                class="lucide lucide-clipboard-list"
+                aria-hidden="true"
+              >
+                <rect width="8" height="4" x="8" y="2" rx="1" ry="1"></rect>
+                <path
+                  d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"
+                ></path>
+                <path d="M12 11h4"></path>
+                <path d="M12 16h4"></path>
+                <path d="M8 11h.01"></path>
+                <path d="M8 16h.01"></path></svg
+              >Ver pedidos</a
+            >
+          </div>
+        </div>
+        <div class="notice">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            class="lucide lucide-info"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M12 16v-4"></path>
+            <path d="M12 8h.01"></path></svg
+          ><span>Proposta visual · todos os dados são fictícios.</span
+          ><a href="MASTER.md">Ler proposta</a>
+        </div>
+        <section class="kpis numeric" aria-label="Exemplos de indicadores">
+          <article class="stat">
+            <div class="stat-head">
+              <span class="stat-icon"
+                ><svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="lucide lucide-wallet"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"
+                  ></path>
+                  <path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"></path></svg></span
+              >Faturamento líquido
+            </div>
+            <strong>R$ 1.842,30</strong
+            ><small><span class="positive">+12,4%</span> em relação a ontem</small>
+          </article>
+          <article class="stat">
+            <div class="stat-head">
+              <span class="stat-icon"
+                ><svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="lucide lucide-credit-card"
+                  aria-hidden="true"
+                >
+                  <rect width="20" height="14" x="2" y="5" rx="2"></rect>
+                  <line x1="2" x2="22" y1="10" y2="10"></line>
+                  <path d="M6 14h2"></path></svg></span
+              >Recebido no período
+            </div>
+            <strong>R$ 1.586,00</strong><small>Recebimentos menos estornos</small>
+          </article>
+          <article class="stat">
+            <div class="stat-head">
+              <span class="stat-icon"
+                ><svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="lucide lucide-panels-top-left lucide-layout"
+                  aria-hidden="true"
+                >
+                  <rect width="18" height="18" x="3" y="3" rx="2"></rect>
+                  <path d="M3 9h18"></path>
+                  <path d="M9 21V9"></path></svg></span
+              >Mesas em atendimento
+            </div>
+            <strong>7 <small style="display: inline">/ 12 mesas</small></strong
+            ><small>5 livres para novos clientes</small>
+          </article>
+          <article class="stat">
+            <div class="stat-head">
+              <span class="stat-icon"
+                ><svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="lucide lucide-ticket"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"
+                  ></path>
+                  <path d="M13 5v2"></path>
+                  <path d="M13 17v2"></path>
+                  <path d="M13 11v2"></path></svg></span
+              >Unidades a entregar
+            </div>
+            <strong>8</strong><small>3 disponíveis · 5 em preparo</small>
+          </article>
+        </section>
+        <section class="charts" id="graficos" aria-label="Exemplos de gráficos">
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <h2>Movimento de pedidos</h2>
+                <p>Volume por hora · dados de demonstração</p>
+              </div>
+              <span class="badge">Hoje</span>
+            </div>
+            <div class="panel-body">
+              <div class="chart-label">
+                <strong class="numeric">50 pedidos</strong><small>Das 12h às 23h</small>
+              </div>
+              <div
+                class="bar-chart"
+                role="img"
+                aria-label="Exemplo de volume de pedidos por hora, de 12h a 23h. Pico de 9 pedidos às 20h."
+              >
+                <span style="--value: 11%"></span><span style="--value: 22%"></span
+                ><span style="--value: 33%"></span><span style="--value: 22%"></span
+                ><span style="--value: 33%"></span><span style="--value: 44%"></span
+                ><span style="--value: 66%"></span><span style="--value: 77%"></span
+                ><span style="--value: 100%"></span><span style="--value: 66%"></span
+                ><span style="--value: 44%"></span><span style="--value: 33%"></span>
+              </div>
+              <div class="axis">
+                <span>12h</span><span>15h</span><span>18h</span><span>21h</span><span>23h</span>
+              </div>
+              <details>
+                <summary>Consultar valores do exemplo</summary>
+                <p>
+                  12h: 1 · 13h: 2 · 14h: 3 · 15h: 2 · 16h: 3 · 17h: 4 · 18h: 6 · 19h: 7 · 20h: 9 ·
+                  21h: 6 · 22h: 4 · 23h: 3.
+                </p>
+              </details>
+            </div>
+          </article>
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <h2>Ocupação do salão</h2>
+                <p>Situação atual da filial</p>
+              </div>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                class="lucide lucide-panels-top-left lucide-layout"
+                aria-hidden="true"
+              >
+                <rect width="18" height="18" x="3" y="3" rx="2"></rect>
+                <path d="M3 9h18"></path>
+                <path d="M9 21V9"></path>
+              </svg>
+            </div>
+            <div class="panel-body">
+              <div class="occupancy">
+                <div
+                  class="ring"
+                  role="img"
+                  aria-label="7 de 12 mesas ocupadas, aproximadamente 58%"
+                >
+                  <div><strong class="numeric">58%</strong><small>ocupado</small></div>
+                </div>
+                <div class="legend numeric">
+                  <div><i class="dot"></i>Ocupadas<b>7</b></div>
+                  <div><i class="dot free"></i>Livres<b>5</b></div>
+                  <div><i class="dot pending"></i>Fechamento<b>2</b></div>
+                </div>
+              </div>
+              <small>As 2 mesas em fechamento estão incluídas nas 7 ocupadas.</small>
+            </div>
+          </article>
+        </section>
+        <section class="panel" id="pedidos" aria-label="Exemplo de tabela de pedidos">
+          <div class="panel-head">
+            <div>
+              <h2>Pedidos da filial</h2>
+              <p>Identificação clara, status e ações no mesmo registro.</p>
+            </div>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              class="lucide lucide-clipboard-list"
+              aria-hidden="true"
+            >
+              <rect width="8" height="4" x="8" y="2" rx="1" ry="1"></rect>
+              <path
+                d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"
+              ></path>
+              <path d="M12 11h4"></path>
+              <path d="M12 16h4"></path>
+              <path d="M8 11h.01"></path>
+              <path d="M8 16h.01"></path>
+            </svg>
+          </div>
+          <div class="tabs">
+            <a href="#pedidos"
+              ><svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                class="lucide lucide-clipboard-list"
+                aria-hidden="true"
+              >
+                <rect width="8" height="4" x="8" y="2" rx="1" ry="1"></rect>
+                <path
+                  d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"
+                ></path>
+                <path d="M12 11h4"></path>
+                <path d="M12 16h4"></path>
+                <path d="M8 11h.01"></path>
+                <path d="M8 16h.01"></path></svg
+              >Pedidos<span class="count">4</span></a
+            >
+          </div>
+          <div class="table-tools">
+            <label class="search"
+              ><svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                class="lucide lucide-search"
+                aria-hidden="true"
+              >
+                <path d="m21 21-4.34-4.34"></path>
+                <circle cx="11" cy="11" r="8"></circle></svg
+              ><span class="sr-only">Buscar pedido, mesa ou comanda</span
+              ><input id="search" type="search" placeholder="Pedido, mesa ou comanda…" /></label
+            ><label class="filter"
+              ><span class="sr-only">Filtrar situação</span
+              ><select id="status">
+                <option value="all">Todas as situações</option>
+                <option value="Entregue">Entregues</option>
+                <option value="A entregar">A entregar</option>
+              </select></label
+            >
+          </div>
+          <table role="table" aria-label="Pedidos fictícios da prévia">
+            <thead>
+              <tr>
+                <th id="order-sort" aria-sort="descending">
+                  <button id="sort">
+                    Pedido e horário
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.8"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      class="lucide lucide-arrow-down"
+                      aria-hidden="true"
+                    >
+                      <path d="M12 5v14"></path>
+                      <path d="m19 12-7 7-7-7"></path>
+                    </svg>
+                  </button>
+                </th>
+                <th>Mesa / comanda</th>
+                <th>Entrega</th>
+                <th class="align-right">Total</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="rows"></tbody>
+          </table>
+          <p id="empty" class="panel-body muted" hidden>Nenhum pedido para esta busca.</p>
+          <div class="pagination">
+            <small id="range" role="status"></small>
+            <div class="actions">
+              <button id="previous" aria-label="Página anterior">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="lucide lucide-chevron-left"
+                  aria-hidden="true"
+                >
+                  <path d="m15 18-6-6 6-6"></path>
+                </svg></button
+              ><span id="page" class="numeric muted"></span
+              ><button id="next" aria-label="Próxima página">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="lucide lucide-chevron-right"
+                  aria-hidden="true"
+                >
+                  <path d="m9 18 6-6-6-6"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </section>
+        <section class="panel" id="componentes">
+          <div class="panel-head">
+            <div>
+              <h2>Uma base para todos os módulos</h2>
+              <p>Sora · Lucide · espaçamento de 4/8 px · controles consistentes.</p>
+            </div>
+          </div>
+          <div class="panel-body">
+            <div class="tokens">
+              <div class="token">
+                <i style="--swatch: var(--brand)"></i><strong>Ação principal</strong
+                ><small>Marca configurável</small>
+              </div>
+              <div class="token">
+                <i style="--swatch: var(--surface)"></i><strong>Superfície</strong
+                ><small>Clara e escura</small>
+              </div>
+              <div class="token">
+                <i style="--swatch: var(--green-bg)"></i><strong>Sucesso</strong
+                ><small>Texto e ícone</small>
+              </div>
+              <div class="token">
+                <i style="--swatch: var(--amber-bg)"></i><strong>Atenção</strong
+                ><small>Estado independente</small>
+              </div>
+            </div>
+          </div>
+        </section>
+        <div class="bottom-note">
+          <span>Prévia independente. Nenhuma operação é enviada ao sistema.</span
+          ><span>Mesa · ERP/SaaS</span>
+        </div>
+      </main>
+    </div>
+    <dialog id="details" aria-labelledby="dialog-title">
+      <div class="modal-heading">
+        <div>
+          <h2 id="dialog-title">Detalhes do pedido</h2>
+          <p>Exemplo da hierarquia de um modal</p>
+        </div>
+        <button class="icon-button close" aria-label="Fechar detalhes">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            class="lucide lucide-x"
+            aria-hidden="true"
+          >
+            <path d="M18 6 6 18"></path>
+            <path d="m6 6 12 12"></path>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="notice">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            class="lucide lucide-info"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M12 16v-4"></path>
+            <path d="M12 8h.01"></path></svg
+          >Este modal apresenta somente dados fictícios.
+        </div>
+        <div class="modal-facts">
+          <div><small>Local e comanda</small><strong id="detail-location"></strong></div>
+          <div>
+            <small>Total do pedido</small><strong id="detail-total" class="numeric"></strong>
+          </div>
+        </div>
+        <label>Observação de exemplo<input value="Sem alterações no pedido" readonly /></label>
+        <p class="muted">
+          Na aplicação, este padrão reutilizará o modal atual e suas proteções de foco, fechamento e
+          alterações não salvas.
+        </p>
+      </div>
+      <div class="modal-footer"><button class="primary close">Fechar visualização</button></div>
+    </dialog>
+    <script>
+      const icons = {
+        eye: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-eye" aria-hidden="true"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"></path><circle cx="12" cy="12" r="3"></circle></svg>`,
+        check: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-circle-check lucide-check-circle-2" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="m16 9-5.5 5.5L8 12"></path></svg>`,
+        clock: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-clock-3" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="M12 6v6h4"></path></svg>`,
+      };
+      const orders = [
+        {
+          id: '1048',
+          time: '20:14',
+          location: 'Mesa 05',
+          tab: 'Comanda da mesa',
+          status: 'A entregar',
+          total: 86.5,
+        },
+        {
+          id: '1047',
+          time: '20:08',
+          location: 'Mesa 02',
+          tab: 'Ana Silva',
+          status: 'Entregue',
+          total: 48,
+        },
+        {
+          id: '1046',
+          time: '19:56',
+          location: 'Balcão / retirada',
+          tab: 'Carlos Lima',
+          status: 'A entregar',
+          total: 32,
+        },
+        {
+          id: '1045',
+          time: '19:42',
+          location: 'Mesa 01',
+          tab: 'Comanda compartilhada',
+          status: 'Entregue',
+          total: 112,
+        },
+      ];
+      const $ = (id) => document.getElementById(id);
+      const currency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+      let page = 1,
+        descending = true;
+      const theme = $('theme');
+      theme.addEventListener('click', () => {
+        const dark = document.documentElement.dataset.theme !== 'dark';
+        document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+        theme.setAttribute('aria-label', dark ? 'Ativar tema claro' : 'Ativar tema escuro');
+        theme.innerHTML = dark
+          ? `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sun" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2"></path><path d="M12 20v2"></path><path d="m4.93 4.93 1.41 1.41"></path><path d="m17.66 17.66 1.41 1.41"></path><path d="M2 12h2"></path><path d="M20 12h2"></path><path d="m6.34 17.66-1.41 1.41"></path><path d="m19.07 4.93-1.41 1.41"></path></svg>`
+          : `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-moon" aria-hidden="true"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"></path></svg>`;
+      });
+      const sidebar = document.querySelector('.sidebar');
+      sidebar.id = 'menu-lateral';
+      const mobile = matchMedia('(max-width: 900px)');
+      function setMenuState() {
+        $('menu').setAttribute(
+          'aria-expanded',
+          String(
+            mobile.matches
+              ? document.body.classList.contains('menu-open')
+              : !document.body.classList.contains('compact'),
+          ),
+        );
+      }
+      function closeMenu() {
+        document.body.classList.remove('menu-open');
+        document.querySelector('.backdrop').hidden = true;
+        setMenuState();
+      }
+      $('menu').addEventListener('click', () => {
+        if (mobile.matches) {
+          document.body.classList.toggle('menu-open');
+          document.querySelector('.backdrop').hidden =
+            !document.body.classList.contains('menu-open');
+        } else {
+          document.body.classList.toggle('compact');
+        }
+        setMenuState();
+      });
+      document.querySelector('.backdrop').addEventListener('click', closeMenu);
+      sidebar.querySelectorAll('a').forEach((a) => a.addEventListener('click', closeMenu));
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && document.body.classList.contains('menu-open')) {
+          closeMenu();
+          $('menu').focus();
+        }
+      });
+      mobile.addEventListener('change', () => {
+        closeMenu();
+        document.body.classList.remove('compact');
+        setMenuState();
+      });
+      setMenuState();
+      function render() {
+        const query = $('search').value.toLocaleLowerCase('pt-BR');
+        const records = orders
+          .filter(
+            (row) =>
+              `${row.id} ${row.location} ${row.tab}`.toLocaleLowerCase('pt-BR').includes(query) &&
+              ($('status').value === 'all' || row.status === $('status').value),
+          )
+          .sort((a, b) => (descending ? b.id.localeCompare(a.id) : a.id.localeCompare(b.id)));
+        const pages = Math.max(1, Math.ceil(records.length / 2));
+        page = Math.min(page, pages);
+        $('rows').innerHTML = records
+          .slice((page - 1) * 2, page * 2)
+          .map(
+            (row) =>
+              `<tr><td data-label="Pedido e horário"><strong>#${row.id}</strong><small>${row.time} · Caixa / PDV</small></td><td data-label="Mesa / comanda"><strong>${row.location}</strong><small>${row.tab}</small></td><td data-label="Entrega"><span class="badge ${row.status === 'A entregar' ? 'pending' : ''}">${row.status === 'A entregar' ? icons.clock : icons.check}${row.status}</span></td><td class="numeric align-right" data-label="Total"><strong>${currency.format(row.total)}</strong></td><td data-label="Ações"><button data-order="${row.id}" aria-label="Ver pedido ${row.id}">${icons.eye}Ver pedido</button></td></tr>`,
+          )
+          .join('');
+        $('range').textContent = records.length
+          ? `Mostrando ${(page - 1) * 2 + 1}–${Math.min(page * 2, records.length)} de ${records.length} pedidos`
+          : '0 pedidos encontrados';
+        $('page').textContent = `${page} / ${pages}`;
+        $('previous').disabled = page === 1;
+        $('next').disabled = page === pages;
+        $('empty').hidden = records.length > 0;
+        $('order-sort').setAttribute('aria-sort', descending ? 'descending' : 'ascending');
+      }
+      $('search').addEventListener('input', () => {
+        page = 1;
+        render();
+      });
+      $('status').addEventListener('change', () => {
+        page = 1;
+        render();
+      });
+      $('sort').addEventListener('click', () => {
+        descending = !descending;
+        page = 1;
+        render();
+      });
+      $('previous').addEventListener('click', () => {
+        page--;
+        render();
+      });
+      $('next').addEventListener('click', () => {
+        page++;
+        render();
+      });
+      $('rows').addEventListener('click', (event) => {
+        const button = event.target.closest('[data-order]');
+        if (!button) return;
+        const row = orders.find((order) => order.id === button.dataset.order);
+        $('dialog-title').textContent = `Pedido #${row.id}`;
+        $('detail-location').textContent = `${row.location} · ${row.tab}`;
+        $('detail-total').textContent = currency.format(row.total);
+        $('details').showModal();
+      });
+      document
+        .querySelectorAll('.close')
+        .forEach((button) => button.addEventListener('click', () => $('details').close()));
+      render();
+    </script>
+  </body>
+</html>

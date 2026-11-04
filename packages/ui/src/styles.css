@@ -873,7 +873,7 @@ td button {
   padding: 6px 9px;
 }
 .resource-table {
-  min-width: 650px !important;
+  min-width: 650px;
 }
 .actions-column {
   text-align: right;
@@ -6378,7 +6378,7 @@ button.catalog-switch[aria-checked='true'] > span {
     flex: 1;
   }
 }
-@container (max-width:480px) {
+@container (max-width:700px) {
   .catalog-products-table {
     display: block;
   }
@@ -6695,17 +6695,6 @@ button.catalog-switch[aria-checked='true'] > span {
   max-width: 160px;
 }
 @media (max-width: 600px) {
-  .table-management-modal .ticket-quick-scan-button {
-    width: 36px;
-    min-height: 38px;
-    padding: 8px;
-  }
-  .table-management-modal .ticket-quick-scan-button > span {
-    display: none;
-  }
-  .table-management-modal .modal-header-actions {
-    margin-left: 0;
-  }
   .ticket-scan-context {
     flex-wrap: wrap;
   }
@@ -7488,6 +7477,7 @@ button.catalog-switch[aria-checked='true'] > span {
   font-weight: 700;
   text-align: right;
 }
+.finance-cash-received,
 .finance-cash-total {
   display: flex;
   justify-content: space-between;
@@ -7495,6 +7485,12 @@ button.catalog-switch[aria-checked='true'] > span {
   font-size: 12px;
   margin: 18px 0;
   align-items: center;
+}
+.finance-cash-received {
+  margin-block: 12px;
+}
+.finance-cash-received strong {
+  font-size: 16px;
 }
 .finance-cash-total strong {
   color: var(--success);
@@ -13982,6 +13978,50 @@ body:has(.customer-app) .toast-region {
   width: 15px;
   flex-shrink: 0;
 }
+.customer-saved-contexts {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  margin-bottom: 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+}
+.customer-saved-contexts > div:first-child {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.customer-saved-contexts > div:first-child > svg {
+  flex-shrink: 0;
+  color: var(--accent-ink, var(--blue));
+  margin-top: 2px;
+}
+.customer-saved-contexts strong,
+.customer-saved-contexts small {
+  display: block;
+  font-size: 11px;
+  line-height: 1.6;
+}
+.customer-saved-contexts small {
+  color: var(--muted);
+  font-size: 10px;
+  margin-top: 2px;
+}
+.customer-saved-contexts button {
+  flex: 1 1 160px;
+  min-height: 44px;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.customer-context-confirmation p {
+  font-size: 13px;
+  line-height: 1.7;
+}
+.customer-context-confirmation .button-row > button {
+  flex: 1 1 200px;
+  min-height: 44px;
+}
 .customer-app .customer-bottom-nav {
   position: fixed;
   inset: auto 0 0;
@@ -14386,6 +14426,92 @@ body:has(.customer-app) .toast-region {
 .customer-ticket-list {
   display: grid;
   gap: 12px;
+}
+.customer-ticket-list > .customer-section-heading {
+  flex-wrap: wrap;
+}
+.customer-ticket-list > .customer-section-heading button {
+  min-height: 44px;
+  padding: 8px 10px;
+  font-size: 11px;
+}
+.customer-ticket-group {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  background: var(--input);
+}
+.customer-ticket-group-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  padding: 4px 2px;
+}
+.customer-ticket-group-heading h3 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  margin: 0;
+}
+.customer-ticket-group-heading svg {
+  color: var(--accent-ink, var(--blue));
+  flex-shrink: 0;
+}
+.customer-ticket-group-heading > span {
+  font-size: 10px;
+  color: var(--muted);
+}
+.customer-ticket-history {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+  min-width: 0;
+}
+.customer-ticket-history > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 12px;
+  cursor: pointer;
+  list-style: none;
+  border-radius: inherit;
+  font-size: 13px;
+}
+.customer-ticket-history > summary::-webkit-details-marker {
+  display: none;
+}
+.customer-ticket-history > summary:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+.customer-ticket-history > summary > svg:first-child {
+  transform: rotate(-90deg);
+}
+.customer-ticket-history[open] > summary > svg:first-child {
+  transform: rotate(0);
+}
+.customer-ticket-history > summary > span {
+  margin-left: auto;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: var(--input);
+  color: var(--muted);
+  font-size: 11px;
+}
+.customer-delivered-tickets > summary > svg:nth-child(2) {
+  color: var(--green);
+}
+.customer-ticket-history > div {
+  display: grid;
+  gap: 10px;
+  padding: 0 10px 10px;
 }
 .customer-app .mini-ticket {
   padding: 16px;
@@ -15719,6 +15845,7 @@ body:has(.request-center-modal) .toast-region {
   .topbar:has(.operation-header-control) > .header-actions {
     width: 100%;
     justify-content: flex-end;
+    flex-wrap: wrap;
     gap: 7px;
   }
   .operation-header-control {
@@ -19949,5 +20076,266 @@ body:has(.operation-control-modal) .toast-info {
   .complement-detail-modal .modal-footer button {
     flex: 1;
     font-size: 11px;
+  }
+}
+
+/* Cabeçalhos compartilhados: títulos completos e ações acessíveis no celular. */
+.modal > .modal-header > .modal-title {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 700px) {
+  .modal > .section-head.modal-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 42px;
+    align-items: start;
+    gap: 12px 8px;
+  }
+  .modal > .modal-header > .modal-title {
+    grid-column: 1;
+    grid-row: 1;
+    margin: 0;
+    line-height: 1.4;
+    white-space: normal;
+  }
+  .modal > .modal-header > .modal-title :where(span, small) {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+  .modal > .modal-header > .modal-title svg {
+    flex-shrink: 0;
+  }
+  .modal > .modal-header > .modal-header-close {
+    grid-column: 2;
+    grid-row: 1;
+    width: 42px;
+    min-height: 42px;
+    padding: 8px;
+    align-self: start;
+  }
+  .modal > .modal-header > .modal-header-actions:not(:empty) {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-row: 2;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 120px), 1fr));
+    width: 100%;
+    min-width: 0;
+    margin: 0;
+    gap: 8px;
+  }
+  .modal > .modal-header > .modal-header-actions > :is(button, a) {
+    width: 100%;
+    min-width: 0;
+    min-height: 42px;
+    padding: 8px;
+    gap: 6px;
+    font-size: 12px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .modal .modal-footer {
+    flex-wrap: wrap;
+  }
+  .modal .modal-footer > button,
+  .modal .modal-footer > .button-row > button {
+    flex: 1 1 132px;
+    min-width: 0;
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .modal .modal-footer > .button-row {
+    min-width: 0;
+    width: 100%;
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 700px) {
+  .ai-chat-header :is(strong, small) {
+    overflow-wrap: anywhere;
+  }
+  .ai-chat-header .icon-button {
+    width: 42px;
+    height: 42px;
+    min-height: 42px;
+    padding: 8px;
+  }
+}
+
+/* Listagens compactas no celular: preserve cada campo e mantenha as ações no card. */
+@media (max-width: 700px) {
+  table.mobile-card-table {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+  .mobile-card-table > thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .mobile-card-table > tbody {
+    display: grid;
+    width: 100%;
+    min-width: 0;
+    gap: 10px;
+  }
+  .mobile-card-table > tbody > tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    min-width: 0;
+    padding: 12px;
+    gap: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md, 8px);
+    background: var(--panel);
+  }
+  .mobile-card-table > tbody > tr > td {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    min-width: 0;
+    padding: 0;
+    gap: 4px;
+    border: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .mobile-card-table > tbody > tr > td::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 500;
+  }
+  .mobile-card-table > tbody > tr > td:is(:first-child, [colspan], [data-label='Ações']) {
+    grid-column: 1 / -1;
+  }
+  .mobile-card-table > tbody > tr > td[data-label='Ações'] {
+    align-items: stretch;
+    padding-top: 10px;
+    border-top: 1px solid var(--line);
+  }
+  .mobile-card-table td[data-label='Ações'] > button {
+    width: 100%;
+    min-height: 38px;
+  }
+  .mobile-card-table .actions-column {
+    width: auto;
+  }
+  .mobile-card-table .resource-row-actions {
+    display: flex;
+    flex-wrap: wrap;
+    width: 100%;
+    gap: 8px;
+  }
+  .mobile-card-table .table-action {
+    width: 38px;
+    height: 38px;
+    flex-shrink: 0;
+  }
+  :is(
+      .mobile-card-table,
+      .inventory-card-table,
+      .payments-table,
+      .print-queue-table,
+      .team-table,
+      .cash-table-wrap,
+      .finance-records,
+      .catalog-products-table
+    )
+    td {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  :is(
+      .mobile-card-table,
+      .inventory-card-table,
+      .payments-table,
+      .print-queue-table,
+      .team-table,
+      .cash-table-wrap,
+      .finance-records,
+      .catalog-products-table
+    )
+    td
+    > :is(div, span, strong, small, p) {
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+  table td button:not([role='switch']):not(.catalog-thumbnail) {
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  table td button > svg {
+    flex-shrink: 0;
+  }
+  table td .button-row,
+  .team-row-actions,
+  .payment-row-actions,
+  .print-queue-actions {
+    min-width: 0;
+    max-width: 100%;
+    flex-wrap: wrap;
+  }
+  table td .button-row > button,
+  .payment-row-actions > button,
+  .print-queue-actions > button {
+    flex: 1 1 110px;
+    min-width: 0;
+    min-height: 38px;
+  }
+  .team-row-actions > button[aria-label^='Ver funcionário'] {
+    flex: 1 1 120px;
+    min-width: 0;
+  }
+  .team-row-actions > button.icon-button {
+    flex: 0 0 38px;
+    width: 38px;
+    min-height: 38px;
+  }
+  .inventory-card-table .numeric,
+  .mobile-card-table .badge {
+    white-space: normal;
+  }
+  .resource-panel > .section-head,
+  .resource-panel > .section-head .button-row {
+    flex-wrap: wrap;
+  }
+  .resource-panel > .section-head > div {
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+  .table-pagination-range,
+  .table-pagination-position {
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .table-pagination-controls {
+    max-width: 100%;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+}
+@container (max-width: 700px) {
+  .catalog-products-table tr {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .catalog-products-table td {
+    min-width: 0;
+  }
+}
+
+@media (max-width: 700px) {
+  .inventory-card-table td[data-label='Ações'] > button {
+    width: 100%;
+    min-height: 38px;
   }
 }

@@ -33,7 +33,7 @@ As fases abaixo possuem código executável, migrations versionadas e verificaç
 
 ## Homologação externa restante
 
-1. Escolher gateway e implementar seu adapter de criação/consulta/estorno, assinatura e conciliação. O fluxo atual é sandbox e bloqueia intents em produção.
+1. Homologar OAuth, pagamento, webhook e estorno reais do Mercado Pago com a aplicação/conta do responsável. O adaptador e a conciliação automática estão implementados; sandbox permanece restrito ao desenvolvimento.
 2. Homologar a impressora real ESC/POS/TCP, largura, QR/Code128 e driver. USB requer transporte específico.
 3. Configurar infraestrutura real: TLS, credenciais de menor privilégio, destino/agendamento de backups e alertas.
 4. Executar piloto no bar com a equipe e validar equipamento, rede e rotina de caixa.

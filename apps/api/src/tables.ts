@@ -1,3 +1,4 @@
+import { pendingRefundOperations } from './gateway-operations.js';
 import { resolveUnit } from '../../../packages/database/src/slugs.js';
 import {
   db,
@@ -291,6 +292,9 @@ async function closingState(s: ScopeType, session: Row) {
       unfinishedOrders.push({ id: order.id, status: order.status });
     }
     if (!tabs.some((t) => t.id === order.tab_id) && order.status === 'CONFIRMED') continue;
+    if ((await pendingRefundOperations(s, order.id)).length) {
+      issues.push('Estorno aguardando confirmação do Mercado Pago.');
+    }
     for (const intent of await s.list('payment_intents', sql`order_id=${order.id}`)) {
       if (['PENDING', 'PROCESSING'].includes(intent.status) && order.status !== 'CANCELLED') {
         issues.push('Pagamento pendente.');

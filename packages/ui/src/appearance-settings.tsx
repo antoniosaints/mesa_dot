@@ -104,6 +104,53 @@ export function AppearanceSettings({
           </p>
         </div>
       </div>
+      <section className="interface-settings" aria-labelledby="interface-style-title">
+        <h3 id="interface-style-title">Estilo da interface</h3>
+        <p className="muted small">
+          Escolha o visual da gestão neste navegador. Os dois estilos funcionam nos modos claro e
+          escuro e mantêm as cores da filial.
+        </p>
+        <div className="interface-options" role="group" aria-label="Estilo da interface">
+          {(
+            [
+              [
+                'classic',
+                'Visual atual',
+                'A interface que você já conhece, com sua organização atual.',
+              ],
+              [
+                'erp',
+                'Mesa ERP',
+                'Gestão padronizada com tabelas compactas, indicadores claros e formulários consistentes.',
+              ],
+            ] as const
+          ).map(([id, name, description]) => (
+            <button
+              key={id}
+              type="button"
+              className={'interface-option ' + (appearance.interfaceStyle === id ? 'selected' : '')}
+              aria-label={'Usar ' + name}
+              aria-pressed={appearance.interfaceStyle === id}
+              onClick={() => appearanceStore.setInterfaceStyle(id)}
+            >
+              <span className={'interface-option-sample sample-' + id} aria-hidden="true">
+                <i />
+                <span>
+                  <i />
+                  <i />
+                  <i />
+                </span>
+              </span>
+              <span className="interface-option-copy">
+                <strong>{name}</strong>
+                <small>{description}</small>
+                <span>{appearance.interfaceStyle === id ? 'Em uso' : 'Usar este visual'}</span>
+              </span>
+              {appearance.interfaceStyle === id && <Icon name="check" size={18} />}
+            </button>
+          ))}
+        </div>
+      </section>
       <section className="appearance-presets-section" aria-label="Presets de cores">
         <h3>Presets de cores</h3>
         <p className="muted small">

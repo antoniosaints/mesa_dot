@@ -35,7 +35,7 @@ import {
 } from './common.js';
 import { Icon } from './appearance.js';
 import { OrderSummary, OrderDetailHeading, shortId } from './operations.js';
-import { useEffect, useState, useRef } from 'react';
+import { useLayoutEffect, useState, useRef } from 'react';
 import { api, brl, session, type Data } from './client.js';
 export function ProductPicker({
   product,
@@ -249,19 +249,32 @@ export function TablePanel({
   const [tabContents, setTabContents] = useState<Data[]>([]);
   const attendanceNav = useRef<HTMLDivElement>(null);
   const previousPhase = useRef(phase);
-  useEffect(() => {
+  const [mobilePanel, setMobilePanel] = useState(table.status === 'FREE' ? 'catalog' : 'operation');
+  const attendanceLoaded = details !== null;
+  useLayoutEffect(() => {
+    const nav = attendanceNav.current;
+    if (!nav?.getClientRects().length) return;
     if (previousPhase.current !== phase) {
       previousPhase.current = phase;
-      if (attendanceNav.current?.getClientRects().length)
-        attendanceNav.current.scrollIntoView({ block: 'start' });
+      nav.scrollIntoView({ block: 'start', inline: 'nearest', behavior: 'instant' });
     }
-  }, [phase]);
+    // External shortcuts select a tab without focusing it. Reveal that tab inside
+    // its scrollable bar, including when a hidden mobile panel becomes visible.
+    const revealSelected = () => {
+      if (!nav.getClientRects().length) return;
+      nav
+        .querySelector<HTMLButtonElement>('[role="tab"][aria-selected="true"]')
+        ?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' });
+    };
+    revealSelected();
+    window.addEventListener('resize', revealSelected);
+    return () => window.removeEventListener('resize', revealSelected);
+  }, [phase, mobilePanel, attendanceLoaded]);
   const [attendanceOrders, setAttendanceOrders] = useState<Data[]>([]);
   const [cancellingOrder, setCancellingOrder] = useState<Data | null>(null);
   const [attendanceTickets, setAttendanceTickets] = useState<Data[]>([]);
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('');
-  const [mobilePanel, setMobilePanel] = useState(table.status === 'FREE' ? 'catalog' : 'operation');
   const [cart, setCart] = useState<DraftLine[]>([]);
   const toast = useToasts();
   function addCartLine(line: DraftLine) {
@@ -414,18 +427,16 @@ export function TablePanel({
             initial: cash[0]?.id,
             options: cash.map((item: Data) => ({
               id: item.id,
-              name: 'Turno ' + item.id.slice(0, 8),
+              name: (item.register_name || 'Caixa') + ' · Turno ' + item.id.slice(0, 8),
             })),
-            hint: 'Obrigatório para recebimento em dinheiro.',
+            hint: 'Vincula dinheiro, Pix e cartão ao turno. Sem seleção, será usado o caixa operacional aberto.',
           },
         ],
         successMessage: 'Recebimento registrado pelo operador.',
         onSubmit: async (values) => {
-          if (values.method === 'CASH' && !values.cash_session_id)
-            throw new Error('Abra um turno de caixa antes de receber em dinheiro.');
           await api('/payments/manual', {
             method: values.method,
-            ...(values.method === 'CASH' ? { cash_session_id: values.cash_session_id } : {}),
+            ...(values.cash_session_id ? { cash_session_id: values.cash_session_id } : {}),
             allocations: [{ tab_id: receivingTab.id, amount: values.amount }],
           });
           await change();
@@ -1079,7 +1090,7 @@ export function TablePanel({
                 <h3>Entregas desta mesa</h3>
                 <p className="muted small">
                   Confira o produto e a comanda. Depois de entregar fisicamente ao cliente, use
-                  “Marcar como entregue”. Não é necessário escanear a ficha para concluir por aqui.
+                  “Entregar”. Não é necessário escanear a ficha para concluir por aqui.
                 </p>
               </div>
               <GroupedTickets

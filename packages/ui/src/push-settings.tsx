@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { api, type Data } from './client.js';
 import { Icon } from './appearance.js';
-import { Modal, ModalCloseButton, Empty, useAction, useRefresh } from './common.js';
-import { Pagination, TableLoading } from './pagination.js';
+import { Modal, ModalCloseButton, useAction, useRefresh } from './common.js';
+import { DataTable } from './data-table.js';
+import { TableLoading } from './pagination.js';
 import type { PushRule } from '../../shared/src/push.js';
 export function PushSettings() {
   const [config, setConfig] = useState<Data | null>(null),
@@ -137,77 +138,89 @@ export function PushSettings() {
             }}
           />
         </label>
-        <div className="data-table" aria-busy={loading}>
-          <table className="push-devices-table">
-            <thead>
-              <tr>
-                <th>Dispositivo</th>
-                <th>Funcionário / perfil</th>
-                <th>Aplicativo</th>
-                <th>Situação</th>
-                <th>Última sincronização</th>
-                <th className="align-right">Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {devices?.rows.map((device: Data) => (
-                <tr key={device.id}>
-                  <td>
-                    <strong>{device.device_name}</strong>
-                    <small className="muted">{device.origin}</small>
-                  </td>
-                  <td>
-                    {device.user_name}
-                    <small className="muted">{device.role_name}</small>
-                  </td>
-                  <td>
-                    {
-                      { admin: 'Gestão', waiter: 'Garçom', kitchen: 'Cozinha' }[
-                        device.surface as 'admin' | 'waiter' | 'kitchen'
-                      ]
-                    }
-                  </td>
-                  <td>
-                    <span className={`badge ${device.enabled ? 'approved' : 'closed'}`}>
-                      {device.enabled ? 'Ativo' : 'Desativado'}
-                    </span>
-                  </td>
-                  <td>
-                    {new Date(device.last_seen_at.replace(' ', 'T') + 'Z').toLocaleString('pt-BR', {
-                      dateStyle: 'short',
-                      timeStyle: 'short',
-                    })}
-                  </td>
-                  <td className="align-right">
-                    <button
-                      className="danger"
-                      disabled={!device.enabled || busy}
-                      onClick={() => setDisabling(device)}
-                    >
-                      <Icon name="close" size={14} />
-                      Desativar
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {loading && <TableLoading label="Carregando dispositivos…" />}
-          {!loading && devices && !devices.rows.length && (
-            <Empty>Nenhum dispositivo encontrado nesta filial.</Empty>
-          )}
-        </div>
-        <Pagination
+        <DataTable<Data>
           label="Dispositivos push"
-          page={devices?.page ?? page}
-          pageSize={size}
-          total={devices?.total ?? 0}
-          onPageChange={setPage}
-          onPageSizeChange={(next) => {
-            setSize(next);
-            setPage(1);
-          }}
+          className="push-devices-table mobile-card-table"
+          rows={devices?.rows ?? []}
+          rowKey={(device) => device.id}
           loading={loading}
+          columns={[
+            {
+              id: 'device',
+              label: 'Dispositivo',
+              render: (device) => (
+                <>
+                  <strong>{device.device_name}</strong>
+                  <small className="muted">{device.origin}</small>
+                </>
+              ),
+            },
+            {
+              id: 'user',
+              label: 'Funcionário / perfil',
+              render: (device) => (
+                <>
+                  {device.user_name}
+                  <small className="muted">{device.role_name}</small>
+                </>
+              ),
+            },
+            {
+              id: 'surface',
+              label: 'Aplicativo',
+              render: (device) =>
+                ({ admin: 'Gestão', waiter: 'Garçom', kitchen: 'Cozinha' })[
+                  device.surface as 'admin' | 'waiter' | 'kitchen'
+                ],
+            },
+            {
+              id: 'state',
+              label: 'Situação',
+              render: (device) => (
+                <span className={`badge ${device.enabled ? 'approved' : 'closed'}`}>
+                  {device.enabled ? 'Ativo' : 'Desativado'}
+                </span>
+              ),
+            },
+            {
+              id: 'seen',
+              label: 'Última sincronização',
+              render: (device) =>
+                new Date(device.last_seen_at.replace(' ', 'T') + 'Z').toLocaleString('pt-BR', {
+                  dateStyle: 'short',
+                  timeStyle: 'short',
+                }),
+            },
+            {
+              id: 'actions',
+              label: 'Ações',
+              align: 'right',
+              className: 'align-right',
+              render: (device) => (
+                <button
+                  className="danger"
+                  disabled={!device.enabled || busy}
+                  onClick={() => setDisabling(device)}
+                >
+                  <Icon name="close" size={14} />
+                  Desativar
+                </button>
+              ),
+            },
+          ]}
+          empty="Nenhum dispositivo encontrado nesta filial."
+          pagination={{
+            label: 'Dispositivos push',
+            page: devices?.page ?? page,
+            pageSize: size,
+            total: devices?.total ?? 0,
+            onPageChange: setPage,
+            onPageSizeChange: (next) => {
+              setSize(next);
+              setPage(1);
+            },
+            loading,
+          }}
         />
         <p className="field-hint">
           Falhas temporárias são reenviadas automaticamente, com até 6 tentativas. Avisos vencem

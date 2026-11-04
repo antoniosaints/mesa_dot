@@ -554,16 +554,15 @@ export function CashWorkspace() {
             ].map(([Symbol, label, value, hint]) => {
               const Component = Symbol as typeof Store;
               return (
-                <section className="panel cash-kpi" key={String(label)}>
-                  <span className="cash-kpi-icon">
-                    <Component size={22} />
-                  </span>
-                  <div>
-                    <span>{String(label)}</span>
-                    <strong>{String(value)}</strong>
-                    <small>{String(hint)}</small>
-                  </div>
-                </section>
+                <StatCard
+                  className="panel cash-kpi"
+                  key={String(label)}
+                  iconClassName="cash-kpi-icon"
+                  label={String(label)}
+                  value={String(value)}
+                  detail={String(hint)}
+                  icon={<Component size={22} />}
+                />
               );
             })}
           </div>
@@ -1043,3 +1042,4 @@ export function CashWorkspace() {
     </div>
   );
 }
+import { StatCard } from './data-display.js';

@@ -1,0 +1,717 @@
+@import './erp-tokens.css';
+@import './erp-components.css';
+@import './erp-workspaces.css';
+@import './erp-tabs.css';
+@import './erp-motion.css';
+
+/* Optional management layout. Legacy CSS remains the default. */
+.mesa-erp {
+  --sidebar-width: 248px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  min-height: 100dvh;
+}
+.mesa-erp .sidebar {
+  --text: var(--sidebar-ink);
+  --muted: var(--sidebar-muted);
+  --line: var(--sidebar-border);
+  --panel-hover: var(--sidebar-hover);
+  border-right: 0;
+  height: 100dvh;
+}
+.mesa-erp .sidebar-brand {
+  min-height: 96px;
+  padding: 20px 16px;
+  gap: var(--space-2);
+}
+.mesa-erp .branch-trigger {
+  margin: 0;
+  padding: 8px;
+  border: 1px solid var(--sidebar-border);
+  background: var(--sidebar-hover);
+  border-radius: var(--radius-card);
+  gap: 8px;
+}
+.mesa-erp .branch-trigger .brand {
+  gap: 8px;
+}
+.mesa-erp .branch-trigger .brand-symbol {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+}
+.mesa-erp .branch-trigger .brand-symbol img {
+  width: 38px;
+  height: 38px;
+}
+.mesa-erp .branch-trigger .brand-copy strong {
+  font-size: 13px;
+  font-weight: 700;
+}
+.mesa-erp .branch-trigger .brand-copy small {
+  font-size: 11px;
+  white-space: normal;
+}
+.mesa-erp .sidebar nav {
+  padding: 8px 12px 16px;
+  gap: 6px;
+}
+.mesa-erp .sidebar nav button {
+  border-radius: var(--radius-control);
+  min-height: 42px;
+  padding: 10px 12px;
+  font-size: 13px;
+  gap: 10px;
+  color: var(--sidebar-muted);
+}
+.mesa-erp .sidebar nav button.active {
+  color: var(--color-on-brand);
+  box-shadow: none;
+}
+.mesa-erp .sidebar nav .nav-group-toggle {
+  font-size: 12px;
+  margin-top: 8px;
+}
+.mesa-erp .nav-group-items {
+  margin-left: 17px;
+  padding-left: 6px;
+}
+.mesa-erp .sidebar nav .nav-group-items button {
+  font-size: 12px;
+  padding-left: 10px;
+}
+.mesa-erp .sidebar-bottom {
+  margin: 0 16px;
+  padding: 16px 0;
+}
+.mesa-erp .sidebar-user > strong {
+  font-size: 12px;
+}
+.mesa-erp .sidebar-user > span {
+  flex-wrap: wrap;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.mesa-erp .sidebar .logout-button {
+  min-height: 40px;
+  border-radius: var(--radius-control);
+}
+.mesa-erp .topbar {
+  height: auto;
+  min-height: 64px;
+  padding: 8px var(--page-gutter);
+  background: var(--color-surface);
+  border-color: var(--color-border);
+  gap: 16px;
+}
+.mesa-erp .topbar-heading {
+  min-width: 0;
+  flex: 1;
+  gap: 12px;
+}
+.mesa-erp .topbar-heading > div {
+  min-width: 0;
+}
+.mesa-erp .topbar-label {
+  font-size: 10px;
+  line-height: 1.2;
+}
+.mesa-erp .topbar-title {
+  font-weight: 700;
+  font-size: 16px;
+  line-height: 1.4;
+}
+.mesa-erp .erp-topbar-context {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  overflow-wrap: anywhere;
+}
+.mesa-erp .topbar-venue {
+  display: none;
+}
+.mesa-erp .topbar .icon-button {
+  width: 40px;
+  min-height: 40px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+}
+.mesa-erp .topbar .icon-button:hover {
+  border-color: var(--color-control-border);
+  background: var(--color-surface-subtle);
+}
+.mesa-erp .topbar .header-actions {
+  gap: 8px;
+  flex-shrink: 0;
+}
+.mesa-erp .operation-order-switch,
+.mesa-erp .operation-cash-indicator {
+  border-radius: var(--radius-control);
+  min-height: 44px;
+}
+.mesa-erp .operation-cash-indicator {
+  font-size: 12px;
+}
+.mesa-erp .notification-panel {
+  width: min(340px, calc(100vw - 32px));
+  min-width: 0;
+  padding: 16px;
+  border-radius: var(--radius-card);
+}
+.mesa-erp .notification-panel button {
+  white-space: normal;
+}
+.erp-header-utilities {
+  position: relative;
+}
+.erp-utilities-panel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.mesa-erp .erp-utilities-trigger {
+  display: none;
+}
+.mesa-erp .page-content {
+  max-width: none;
+  padding: 16px var(--page-gutter) 32px;
+}
+.mesa-erp .page-title {
+  margin-bottom: 12px;
+  align-items: center;
+}
+.mesa-erp .page-title h1 {
+  font-size: 27px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.mesa-erp .page-title p {
+  font-size: 13px;
+  margin-top: 8px;
+}
+.mesa-erp .page-title .eyebrow {
+  font-size: 11px;
+  letter-spacing: 1.4px;
+}
+.mesa-erp .overview-workspace {
+  gap: var(--layout-gap);
+}
+.mesa-erp .overview-workspace .panel {
+  padding: 16px;
+  border-radius: var(--radius-card);
+}
+.mesa-erp .overview-workspace .section-head {
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.mesa-erp .overview-workspace h2 {
+  font-size: 16px;
+  font-weight: 700;
+}
+.mesa-erp .overview-toolbar {
+  gap: 16px;
+}
+.mesa-erp .overview-toolbar h2 {
+  margin: 6px 0;
+}
+.mesa-erp .overview-scope-label,
+.mesa-erp .overview-period > span,
+.mesa-erp .overview-toolbar p {
+  font-size: 12px;
+}
+.mesa-erp .overview-presets {
+  gap: 4px;
+}
+.mesa-erp .overview-presets button {
+  font-size: 12px;
+  min-height: 36px;
+  padding: 8px 10px;
+  border-radius: 8px;
+}
+.mesa-erp .overview-reload {
+  min-height: 40px;
+  border-radius: var(--radius-control);
+  border-color: var(--color-control-border);
+}
+.mesa-erp .overview-custom-period label {
+  font-size: 13px;
+}
+.mesa-erp .overview-custom-period input {
+  border-color: var(--color-control-border);
+}
+.mesa-erp .overview-brief {
+  padding: 12px 16px;
+  border-radius: var(--radius-card);
+}
+.mesa-erp .overview-brief p {
+  font-size: 13px;
+  line-height: 1.6;
+}
+.mesa-erp .overview-updated {
+  font-size: 12px;
+}
+.mesa-erp .overview-updated small {
+  font-size: 12px;
+}
+.mesa-erp .overview-section-title > span {
+  font-size: 12px;
+}
+.mesa-erp .overview-kpis {
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+.mesa-erp .stat-card {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-content: start;
+  gap: 4px 10px;
+  padding: 12px;
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  min-width: 0;
+}
+.mesa-erp .stat-card-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  align-self: center;
+}
+.mesa-erp .stat-card > div {
+  display: contents;
+}
+.mesa-erp .stat-card .stat-card-label {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: center;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+}
+.mesa-erp .stat-card .stat-card-value {
+  grid-column: 2;
+  grid-row: 2;
+  font-size: clamp(22px, 1.8vw, 27px);
+  font-weight: 700;
+  letter-spacing: -0.7px;
+  line-height: 1.2;
+  color: var(--color-text);
+}
+.mesa-erp .stat-card .stat-card-detail {
+  grid-column: 1 / -1;
+  grid-row: 3;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+  margin-top: 4px;
+}
+.mesa-erp .overview-alerts {
+  border-left: 3px solid var(--amber);
+}
+.mesa-erp .overview-alerts .section-head > span,
+.mesa-erp .overview-alerts small,
+.mesa-erp .overview-alerts strong {
+  font-size: 12px;
+}
+.mesa-erp .overview-alerts > button {
+  border-radius: var(--radius-control);
+  padding: 12px;
+}
+.mesa-erp .overview-clear {
+  padding: 16px;
+  font-size: 13px;
+}
+.mesa-erp .overview-charts {
+  grid-template-columns: minmax(0, 1.7fr) minmax(260px, 1fr);
+  gap: 16px;
+}
+.mesa-erp .overview-charts.single {
+  grid-template-columns: 1fr;
+}
+.mesa-erp .chart-card > .section-head {
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--color-border);
+}
+.mesa-erp .chart-card > .section-head p,
+.mesa-erp .chart-card > .section-head small,
+.mesa-erp .overview-live,
+.mesa-erp .overview-chart-detail {
+  font-size: 12px;
+}
+.mesa-erp .overview-bar-track {
+  height: 175px;
+}
+.mesa-erp .overview-bar-track i {
+  background: var(--color-brand-ink);
+  opacity: 0.9;
+}
+.mesa-erp .overview-bars > button small {
+  font-size: 12px;
+  visibility: hidden;
+}
+.mesa-erp .overview-bars > button:nth-child(3n + 1) small,
+.mesa-erp .overview-bars > button.selected small,
+.mesa-erp .overview-bars > button:focus-visible small {
+  visibility: visible;
+}
+.mesa-erp .overview-ring {
+  background: conic-gradient(
+    var(--color-brand-ink) 0 var(--occupancy),
+    var(--color-border) var(--occupancy) 100%
+  );
+}
+.mesa-erp .overview-ring small,
+.mesa-erp .overview-occupancy-legend > span,
+.mesa-erp .overview-top-products small,
+.mesa-erp .overview-service-split > span,
+.mesa-erp .overview-recent-list small {
+  font-size: 12px;
+}
+.mesa-erp .overview-occupancy-legend .is-occupied {
+  background: var(--color-brand-ink);
+}
+.mesa-erp .overview-top-products strong,
+.mesa-erp .overview-recent-list strong,
+.mesa-erp .overview-sources span {
+  font-size: 13px;
+}
+.mesa-erp .overview-attendances td {
+  font-size: 13px;
+}
+.mesa-erp .overview-attendances button,
+.mesa-erp .overview-recent > .section-head button {
+  border-radius: var(--radius-control);
+}
+.mesa-erp .overview-detail-grid {
+  gap: 16px;
+}
+.mesa-erp .overview-recent-list > button {
+  padding-block: 12px;
+}
+.mesa-erp .overview-workspace :is(button, input, select) {
+  border-radius: var(--radius-control);
+}
+.mesa-erp .overview-workspace :is(button, a):focus-visible {
+  outline-color: var(--color-brand-ink);
+}
+
+/* This selector is part of Settings and is available in both visual styles. */
+.interface-settings {
+  padding-bottom: 24px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--line);
+}
+.interface-settings > p {
+  margin-top: 6px;
+}
+.interface-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+.interface-option {
+  padding: 16px;
+  gap: 16px;
+  align-items: flex-start;
+  justify-content: flex-start;
+  text-align: left;
+  background: var(--panel);
+  border-radius: 12px;
+  min-width: 0;
+}
+.interface-option.selected {
+  border-color: var(--accent-ink);
+  box-shadow: 0 0 0 1px var(--accent-ink);
+  background: var(--soft-blue);
+}
+.interface-option-copy {
+  flex: 1;
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.interface-option-copy strong {
+  font-size: 15px;
+}
+.interface-option-copy small {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+.interface-option-copy > span {
+  color: var(--accent-ink);
+  font-size: 12px;
+}
+.interface-option > svg {
+  color: var(--accent-ink);
+}
+.interface-option-sample {
+  display: flex;
+  width: 88px;
+  height: 64px;
+  padding: 5px;
+  gap: 5px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  flex-shrink: 0;
+}
+.interface-option-sample > i {
+  width: 22px;
+  border-radius: 4px;
+  background: var(--sidebar-bg);
+}
+.interface-option-sample > span {
+  display: grid;
+  flex: 1;
+  gap: 5px;
+  grid-template-columns: 1fr 1fr;
+  padding-top: 10px;
+}
+.interface-option-sample > span > i {
+  border-radius: 3px;
+  background: var(--soft-blue);
+  border: 1px solid var(--primary-border);
+}
+.interface-option-sample > span > i:last-child {
+  grid-column: 1 / -1;
+}
+.sample-classic > i {
+  width: 28px;
+}
+.sample-classic > span {
+  grid-template-columns: 1fr;
+}
+.sample-classic > span > i:last-child {
+  display: none;
+}
+@media (min-width: 901px) {
+  .mesa-erp.sidebar-collapsed {
+    --sidebar-width: 76px;
+  }
+  .mesa-erp.sidebar-collapsed .sidebar-brand {
+    padding: 20px 8px;
+  }
+  .mesa-erp.sidebar-collapsed .branch-trigger {
+    width: 52px;
+    padding: 6px;
+  }
+  .mesa-erp.sidebar-collapsed .sidebar nav {
+    padding-inline: 12px;
+  }
+  .mesa-erp.sidebar-collapsed .nav-group-items {
+    margin: 0;
+    padding: 0;
+  }
+  .mesa-erp.sidebar-collapsed .sidebar nav button {
+    min-height: 44px;
+    padding: 8px;
+    gap: 0;
+  }
+}
+@media (max-width: 1200px) {
+  .mesa-erp .erp-utilities-trigger {
+    display: inline-flex;
+  }
+  .mesa-erp .erp-utilities-panel {
+    display: none;
+  }
+  .mesa-erp .erp-header-utilities.is-open .erp-utilities-panel {
+    display: flex;
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    width: min(280px, calc(100vw - 32px));
+    padding: 12px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow);
+    z-index: 35;
+    flex-wrap: wrap;
+  }
+  .mesa-erp .overview-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .mesa-erp .overview-charts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 900px) {
+  .mesa-erp .sidebar {
+    width: min(248px, calc(100vw - 32px));
+  }
+  .mesa-erp .admin-main {
+    margin-left: 0;
+  }
+  .mesa-erp .sidebar-brand {
+    padding: 16px 12px;
+  }
+  .mesa-erp .sidebar-brand .mobile-menu-close {
+    width: 36px;
+    flex-shrink: 0;
+  }
+  .mesa-erp .branch-trigger .brand-copy small {
+    display: none;
+  }
+  .mesa-erp .sidebar nav button {
+    min-height: 44px;
+  }
+  .mesa-erp .topbar,
+  .mesa-erp .topbar:has(.operation-header-control) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) repeat(3, 44px);
+    gap: 8px 6px;
+    padding: 12px 16px;
+    align-items: center;
+  }
+  .mesa-erp .topbar-heading {
+    grid-column: 1;
+    min-width: 0;
+    gap: 8px;
+  }
+  .mesa-erp .topbar-label {
+    display: none;
+  }
+  .mesa-erp .topbar-title {
+    font-size: 14px;
+    overflow-wrap: anywhere;
+  }
+  .mesa-erp .erp-topbar-context {
+    font-size: 11px;
+  }
+  .mesa-erp .topbar .icon-button {
+    width: 44px;
+    min-height: 44px;
+  }
+  .mesa-erp .topbar > .header-actions {
+    display: contents;
+  }
+  .mesa-erp .erp-header-utilities {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .mesa-erp .topbar .notifications {
+    grid-column: 3;
+    grid-row: 1;
+  }
+  .mesa-erp .topbar .theme-toggle {
+    grid-column: 4;
+    grid-row: 1;
+  }
+  .mesa-erp .operation-header-control {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    width: 100%;
+    margin: 0;
+    gap: 8px;
+  }
+  .mesa-erp .operation-header-control > button {
+    flex: 1;
+    max-width: none;
+    justify-content: center;
+  }
+  .mesa-erp .operation-cash-indicator {
+    font-size: 12px;
+    white-space: normal;
+  }
+  .mesa-erp .notification-panel {
+    right: -50px;
+  }
+  .mesa-erp .erp-header-utilities.is-open .erp-utilities-panel {
+    right: -100px;
+  }
+  .mesa-erp .page-content {
+    padding: 12px 12px 24px;
+  }
+  .mesa-erp .page-title {
+    align-items: flex-start;
+  }
+}
+@media (max-width: 700px) {
+  .interface-options {
+    grid-template-columns: 1fr;
+  }
+  .interface-option {
+    padding: 12px;
+    gap: 12px;
+  }
+  .interface-option-sample {
+    width: 72px;
+  }
+  .mesa-erp .page-title h1 {
+    font-size: 24px;
+  }
+  .mesa-erp .page-title p {
+    font-size: 13px;
+  }
+  .mesa-erp .overview-workspace {
+    gap: var(--layout-gap);
+  }
+  .mesa-erp .overview-workspace .panel {
+    padding: 16px;
+  }
+  .mesa-erp .overview-workspace .section-head {
+    flex-wrap: wrap;
+  }
+  .mesa-erp .overview-toolbar {
+    gap: 16px 12px;
+  }
+  .mesa-erp .overview-toolbar > div:first-child {
+    flex-basis: 100%;
+  }
+  .mesa-erp .overview-toolbar .overview-period {
+    width: 100%;
+    order: 0;
+  }
+  .mesa-erp .overview-toolbar .overview-reload {
+    margin-left: 0;
+    min-height: 44px;
+    font-size: 12px;
+    width: 100%;
+  }
+  .mesa-erp .overview-presets {
+    gap: 8px;
+  }
+  .mesa-erp .overview-presets button {
+    min-height: 44px;
+  }
+  .mesa-erp .overview-brief {
+    padding: 16px;
+  }
+  .mesa-erp .overview-kpis {
+    gap: 12px;
+  }
+  .mesa-erp .stat-card {
+    padding: 12px;
+  }
+  .mesa-erp .stat-card .stat-card-value {
+    font-size: clamp(20px, 5.5vw, 26px);
+    overflow-wrap: anywhere;
+  }
+  .mesa-erp .overview-section-title > button {
+    margin-left: 0;
+    white-space: normal;
+  }
+  .mesa-erp .overview-occupancy {
+    grid-template-columns: 110px minmax(0, 1fr);
+    gap: 16px;
+  }
+  .mesa-erp .overview-ring {
+    width: 110px;
+    height: 110px;
+    padding: 11px;
+  }
+  .mesa-erp .overview-attendances .section-head > button {
+    width: 100%;
+    min-height: 44px;
+  }
+  .mesa-erp .overview-workspace input {
+    font-size: 16px;
+    min-height: 44px;
+  }
+}

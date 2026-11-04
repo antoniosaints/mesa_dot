@@ -282,16 +282,15 @@ export function TeamWorkspace() {
             tone: 'blue',
           },
         ].map((k) => (
-          <section className={'panel team-kpi ' + k.tone} key={k.label}>
-            <span className="team-kpi-icon">
-              <k.icon size={21} />
-            </span>
-            <div>
-              <span>{k.label}</span>
-              <strong>{k.value ?? '—'}</strong>
-              <small>{k.hint}</small>
-            </div>
-          </section>
+          <StatCard
+            className={'panel team-kpi ' + k.tone}
+            key={k.label}
+            iconClassName="team-kpi-icon"
+            label={k.label}
+            value={k.value ?? '—'}
+            detail={k.hint}
+            icon={<k.icon size={21} />}
+          />
         ))}
       </div>
       <section className="panel team-directory" aria-busy={queryBusy}>
@@ -703,3 +702,4 @@ export function TeamWorkspace() {
     </div>
   );
 }
+import { StatCard } from './data-display.js';

@@ -1,4 +1,5 @@
 import { useSearchParams } from 'react-router';
+import { useInterfaceSurface } from './interface-scope.js';
 import {
   Children,
   isValidElement,
@@ -40,6 +41,9 @@ export function SearchSelect({
   className = '',
   popupClassName = '',
   renderOptionLeading,
+  id: inputId,
+  describedBy,
+  invalid,
 }: {
   options: SelectOption[];
   value: string;
@@ -53,7 +57,11 @@ export function SearchSelect({
   className?: string;
   popupClassName?: string;
   renderOptionLeading?: (option: SelectOption) => ReactNode;
+  id?: string;
+  describedBy?: string;
+  invalid?: boolean;
 }) {
+  const interfaceSurface = useInterfaceSurface();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
@@ -141,6 +149,9 @@ export function SearchSelect({
       {!open && <ColorDot color={selected?.color} />}
       <input
         ref={input}
+        id={inputId}
+        aria-describedby={describedBy}
+        aria-invalid={invalid || undefined}
         role="combobox"
         aria-label={label}
         aria-expanded={open}
@@ -232,7 +243,7 @@ export function SearchSelect({
           <div
             ref={popup}
             id={`${id}-list`}
-            className={`select-popup ${popupClassName}`}
+            className={`select-popup ${popupClassName} ${interfaceSurface}`}
             role="listbox"
             aria-label={`Opções de ${label}`}
             style={{

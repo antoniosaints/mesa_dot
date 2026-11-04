@@ -11,6 +11,26 @@ import {
   validColor,
 } from '../packages/ui/src/preferences.js';
 describe('Aparência e legibilidade', () => {
+  it.each(['dark', 'light'] as const)(
+    'marca legível sobre todas as superfícies do ERP no tema %s',
+    (theme) => {
+      const surfaces =
+        theme === 'dark' ? ['#090e1a', '#0e1525', '#131e32'] : ['#f5f7fb', '#ffffff', '#f8fafc'];
+      for (const color of [
+        '#2584f8',
+        '#0757f9',
+        '#8b5cf6',
+        '#059669',
+        '#db2777',
+        '#777777',
+        '#ffffff',
+        '#000000',
+      ]) {
+        const ink = readableAccent(color, theme, surfaces);
+        for (const surface of surfaces) expect(contrast(ink, surface)).toBeGreaterThanOrEqual(4.5);
+      }
+    },
+  );
   it('aceita apenas cores hexadecimais completas', () => {
     expect(validColor('#8b5cf6')).toBe(true);
     for (const color of ['red', '#fff', 'url(javascript:alert(1))', '#1234567', ''])

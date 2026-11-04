@@ -1,5 +1,16 @@
 import { rows, sql, type Scope, type Row } from '../../../packages/database/src/index.js';
 import { ensure } from '../../../packages/shared/src/index.js';
+/** Receiving operators can choose a named shift without cash-management access. */
+export async function activeCashSessions(s: Scope) {
+  return rows(
+    s.tx,
+    sql`SELECT cs.*,cr.name register_name FROM cash_sessions cs
+    JOIN cash_registers cr ON cr.id=cs.register_id AND cr.tenant_id=cs.tenant_id AND cr.establishment_id=cs.establishment_id
+    JOIN establishments e ON e.id=cs.establishment_id AND e.tenant_id=cs.tenant_id
+    WHERE cs.tenant_id=${s.actor.tenantId} AND cs.establishment_id=${s.actor.establishmentId} AND cs.status='OPEN'
+    ORDER BY (cs.id=e.order_cash_session_id) DESC,cs.created_at,cs.id`,
+  );
+}
 /** All order/cash transitions acquire this lock first, including the no-open-cash case. */
 export async function lockCashUnit(s: Scope): Promise<Row> {
   const units = await rows(

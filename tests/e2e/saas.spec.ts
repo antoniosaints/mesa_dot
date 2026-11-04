@@ -1,3 +1,4 @@
+import { expectMobileListLayout } from './list-layout.js';
 import { test } from './test.js';
 import { expect } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
@@ -161,7 +162,15 @@ test('gestor gerencia planos, assinaturas e suspensão com sessão separada', as
   );
   await page.setViewportSize({ width: 320, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await expectMobileListLayout(page.locator('.mesa-root-table'));
   await page.screenshot({ path: '.local/screenshots/mesa-saas-mobile.png', fullPage: true });
+  for (const label of ['Planos', 'Auditoria']) {
+    await page
+      .getByRole('navigation', { name: 'Gestão do SaaS no celular', exact: true })
+      .getByRole('link', { name: label, exact: true })
+      .click();
+    await expectMobileListLayout(page.locator('.mesa-root-table'));
+  }
   await page.getByRole('button', { name: 'Sair do gestor', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Entrar no gestor SaaS' })).toBeVisible();
   await page.reload();

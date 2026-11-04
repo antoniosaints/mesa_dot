@@ -1,5 +1,15 @@
 # PROMPT MESTRE — DESIGN SYSTEM ERP / SAAS PROFISSIONAL
 
+## Estilos disponíveis na gestão
+
+Em **Configurações → Aparência → Estilo da interface**, cada navegador pode escolher **Visual atual** (padrão) ou **Mesa ERP**. O estilo é independente do modo claro/escuro e das cores da filial; a troca não altera configurações do negócio. A preferência `mesa-interface` permanece após recarregar e trocar de filial.
+
+O Mesa ERP aplica o [design system reutilizável](design-system/mesa/MASTER.md) às telas da gestão: salão, pedidos, catálogo, estoque, produção, financeiro, pagamentos, caixa, equipe, impressão, configurações e complementos. `erp-theme.css` é a entrada; `erp-tokens.css` define a fundação, `erp-components.css` os componentes e `erp-workspaces.css` as composições. O escopo `mesa-erp` cobre o layout, e `mesa-erp-surface` cobre modais e dropdowns renderizados em portais. Preserve o visual atual fora desse escopo. Não imponha a navegação administrativa ao PWA do cliente, garçom, cozinha ou portal público.
+
+Reutilize `AppShell`, `AppSidebar`, `AppTopbar` e `HeaderUtilities` de `admin-layout.tsx`; indicadores e gráficos usam `StatCard` e `ChartCard` de `data-display.tsx`. `DataTable`, `TableToolbar` e `TableActions` apresentam listagens sem controlar consultas; `FormField` conecta rótulos, hints e erros. `useFormValidation` oferece resumo acessível nos formulários compartilhados do ERP. Modais mantêm as proteções existentes e aceitam tamanhos `confirm`, `form`, `detail` e `wide`. Cores de marca continuam vindo de `appearanceStore`, inclusive a primária e o fundo da sidebar personalizados; o destaque do ERP verifica contraste sobre todas as superfícies.
+
+No Mesa ERP, priorize densidade de trabalho: espaço entre blocos de 12 px, cards de indicadores com padding de 12 px e painéis de 16 px. Não some margem inferior de título ao gap do container. O conteúdo usa a largura disponível com recuos de 20 px no desktop e 12 px no celular; preserve alvos de toque de 44 px. `erp-motion.css` define relevo nos botões de ação, pressão por sombra interna e entradas de modais/menus em 120–180 ms. `AppPageContent` anima a navegação sem remontar os filhos. Respeite movimento reduzido e nunca anime altura/largura de formulários, tabelas ou previews PDF.
+
 Você é um especialista sênior em UI/UX Design, Frontend Engineering e arquitetura de interfaces para sistemas ERP, SaaS, CRM, PDV e painéis administrativos.
 
 Sua missão é desenvolver e manter todas as interfaces deste projeto seguindo um padrão visual consistente, moderno, limpo, profissional e funcional.
@@ -88,7 +98,7 @@ Mobile:
 
 ## 4. TIPOGRAFIA
 
-Utilizar preferencialmente Inter.
+Utilizar Sora local, preservando o semibold (600) nos controles e textos operacionais. No Mesa ERP, títulos e indicadores usam 700; textos explicativos podem usar 500. Não adicionar fontes externas para substituir a identidade atual.
 
 Hierarquia:
 
@@ -146,6 +156,8 @@ Toda listagem administrativa deve considerar:
 
 Não exagerar em bordas ou cores. A tabela deve ser visualmente limpa.
 
+No celular, priorize cards com rótulos por campo e ações dentro de cada registro, sem esconder colunas necessárias à operação. Para tabelas simples, reutilize `mobile-card-table`, atribua `data-label` às células e mantenha os cabeçalhos semânticos. Preserve os layouts especializados existentes quando já forem responsivos. Nomes longos, valores e grupos de ações devem respeitar a largura disponível; os botões e a paginação podem quebrar linha. Não use apenas `overflow: hidden` para mascarar conteúdo ou comandos cortados.
+
 ## 7. DRAWERS LATERAIS
 
 Para cadastrar, consultar ou editar registros, priorizar drawer lateral quando isso preservar o contexto da listagem.
@@ -178,6 +190,8 @@ Usar modal para:
 Modais complexos podem utilizar múltiplas colunas no desktop, mas devem se adaptar para abas ou painéis empilhados no mobile.
 
 O modal deve apresentar hierarquia clara, foco acessível, botão de fechamento e feedback após cada operação.
+
+No celular (até 700 px), use o cabeçalho compartilhado de `Modal`: título completo com quebra de linha e botão de fechar na primeira linha; ações adicionais em uma segunda linha com botões proporcionais. Não comprima o título para acomodar as ações nem esconda os rótulos. Rodapés devem permitir quebra de linhas e dos textos dos botões, preservando todos os comandos e as confirmações de alterações não salvas. As classes `modal-header`, `modal-title` e `modal-header-close` centralizam esse comportamento; estilos locais devem manter esse contrato.
 
 ## 9. FORMULÁRIOS
 
@@ -319,9 +333,9 @@ Não duplicar layouts e estilos entre módulos.
 
 ### Padrão das abas
 
-As abas devem seguir o modal de gestão do produto: ícone Lucide junto ao texto, fundo suave e linha inferior de 2px na cor principal para a opção ativa, sem formato de pílula. Mantenha os contadores compactos, foco visível, navegação por teclado e adaptação ao tema claro ou escuro. Quando não houver espaço, permita rolagem dentro da barra, sem gerar rolagem horizontal na página.
+No **Mesa ERP**, as abas usam controle agrupado compacto: faixa com padding de 3 px, borda discreta e raio de 12 px; cada opção tem altura mínima de 40 px no desktop e 44 px no celular, raio de 9 px e ícone Lucide junto ao texto. A aba selecionada recebe preenchimento sólido na primária da aparência e texto com contraste calculado, sem sublinhado. Seus contadores usam fundo de superfície e texto de destaque com contraste, mantendo os números legíveis sobre qualquer primária. O visual atual e os PWAs preservam o fundo suave com linha inferior de 2 px. Mantenha foco visível, navegação por teclado e adaptação ao tema claro ou escuro. Quando não houver espaço, permita rolagem dentro da barra, sem gerar rolagem horizontal na página.
 
-Neste projeto, use os componentes `Tabs` e `Tab` de `packages/ui/src/controls.tsx`, informando um `icon` para cada aba. Navegações especializadas utilizam a classe compartilhada `system-tabs`, definida em `packages/ui/src/styles.css`. Estilos locais devem ajustar apenas o layout; cores, bordas e estados das abas são centralizados. A navegação inferior do cliente mantém sua posição e organização para toque no celular.
+Neste projeto, use os componentes `Tabs` e `Tab` de `packages/ui/src/controls.tsx`, informando um `icon` para cada aba. Navegações especializadas utilizam a classe compartilhada `system-tabs`, definida em `packages/ui/src/styles.css`, com a apresentação do Mesa ERP centralizada em `erp-tabs.css`. Estilos locais devem ajustar apenas o layout; cores, bordas e estados das abas são centralizados. A navegação inferior do cliente mantém sua posição e organização para toque no celular.
 
 ## 16. PADRÃO DE PÁGINAS
 

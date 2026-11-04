@@ -1,4 +1,6 @@
 export const scopedTables = [
+  'gateway_operations',
+  'payment_reconciliation',
   'unit_complements',
   'complement_oauth_states',
   'order_item_assignments',

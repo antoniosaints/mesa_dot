@@ -1,3 +1,4 @@
+import { assertNoPendingRefund } from './gateway-operations.js';
 import { closeCounterIfComplete } from './counter-lifecycle.js';
 import { businessAvailability } from '../../../packages/shared/src/business-hours.js';
 import { lockCashUnit, selectOrderCash } from './cash-sessions.js';
@@ -259,6 +260,7 @@ export async function confirmOrder(s: Scope, id: string, internal = false): Prom
     'INVALID_STATE',
     'Pedido não pode ser confirmado.',
   );
+  await assertNoPendingRefund(s, order.id);
   const u = await unit(s);
   ensure(u.is_open, 'INVALID_STATE', 'Estabelecimento fechado.');
   if (order.payment_policy_snapshot === 'PREPAID')
@@ -448,6 +450,7 @@ export async function confirmOrder(s: Scope, id: string, internal = false): Prom
 export async function cancelOrder(s: Scope, id: string, reason: string) {
   permit(s.actor, 'order.cancel');
   const order = await s.get('orders', id, true);
+  await assertNoPendingRefund(s, order.id);
   ensure(order.status !== 'CANCELLED', 'INVALID_STATE', 'Pedido já cancelado.');
   ensure(
     (await approvedForOrder(s, id)) === 0n,

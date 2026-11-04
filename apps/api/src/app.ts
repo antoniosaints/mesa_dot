@@ -1,4 +1,7 @@
+import { paymentHttpSchema } from './payment-http-schema.js';
 import { registerComplements } from './complements-routes.js';
+import { trustedProxyAddresses } from './trusted-proxy.js';
+import { paymentCheckout, paymentRefund } from './mercado-financial.js';
 import { dashboardOverview } from './dashboard-overview.js';
 import { productPhotoSchema, saveProductPhoto, registerProductPhotos } from './product-photos.js';
 import {
@@ -40,7 +43,7 @@ import {
   openOperationCash,
   openControlCashSchema,
 } from './operation-control.js';
-import { lockCashUnit } from './cash-sessions.js';
+import { activeCashSessions, lockCashUnit } from './cash-sessions.js';
 import { tableQrPdf } from './table-qr-pdf.js';
 import { saleStockCatalog, visibleSaleCatalog } from './sale-stock.js';
 import {
@@ -117,13 +120,7 @@ import {
   assertAssignableRole,
 } from './auth.js';
 import { createOrder, confirmOrder, cancelOrder, accessOrder, accessTab, unit } from './orders.js';
-import {
-  createIntent,
-  capturePayment,
-  receiveManual,
-  refundPayment,
-  tabBalance,
-} from './payments.js';
+import { capturePayment, receiveManual, tabBalance } from './payments.js';
 import {
   ticketDocument,
   redeemTicket,
@@ -178,6 +175,7 @@ const strict = <T extends z.ZodRawShape>(shape: T) => z.object(shape).strict();
 const idBody = strict({ order_id: uuid });
 export async function buildApp(options: { realtime?: boolean; logger?: boolean } = {}) {
   const app = Fastify({
+    trustProxy: trustedProxyAddresses(env.TRUSTED_PROXIES),
     logger:
       options.logger !== false
         ? {
@@ -190,6 +188,7 @@ export async function buildApp(options: { realtime?: boolean; logger?: boolean }
             serializers: {
               req: (request: Row) => ({
                 method: request.method,
+                ip: request.ip,
                 url: String(request.url).startsWith('/api/v1/complements/mercadopago/callback')
                   ? '/api/v1/complements/mercadopago/callback'
                   : request.url,
@@ -691,9 +690,10 @@ export async function buildApp(options: { realtime?: boolean; logger?: boolean }
   route('POST', '/service-requests/:id/cancel', null, null, async (s, _b, req) =>
     cancelRequest(s, id(req)),
   );
-  route('POST', '/payments/intents', null, idBody, async (s, b) => {
-    if (s.actor.kind === 'STAFF') permit(s.actor, 'payment.receive');
-    return createIntent(s, b.order_id);
+  app.post('/api/v1/payments/intents', paymentHttpSchema(idBody), async (req) => {
+    const current = await actor(req),
+      input = idBody.parse(req.body);
+    return paymentCheckout(current, key(req), input.order_id);
   });
   route('GET', '/catalog/operational', 'order.create', null, async (s) => {
     const settings = await unit(s);
@@ -760,12 +760,22 @@ export async function buildApp(options: { realtime?: boolean; logger?: boolean }
     }),
     async (s, b) => receiveManual(s, b),
   );
-  route(
-    'POST',
-    '/payments/:id/refund',
-    'payment.refund',
-    strict({ amount, tab_id: uuid.optional(), reason, cash_session_id: uuid.optional() }),
-    async (s, b, req) => refundPayment(s, id(req), b),
+  app.post(
+    '/api/v1/payments/:id/refund',
+    paymentHttpSchema(
+      strict({ amount, tab_id: uuid.optional(), reason, cash_session_id: uuid.optional() }),
+    ),
+    async (req) => {
+      const current = await actor(req);
+      permit(current, 'payment.refund');
+      const input = strict({
+        amount,
+        tab_id: uuid.optional(),
+        reason,
+        cash_session_id: uuid.optional(),
+      }).parse(req.body);
+      return paymentRefund(current, key(req), id(req), input);
+    },
   );
   const gatewaySchema = strict({
     event_id: z.string().min(8).max(128),
@@ -933,9 +943,7 @@ export async function buildApp(options: { realtime?: boolean; logger?: boolean }
     async (s, b, req) => advanceProduction(s, id(req), b.status),
   );
   route('GET', '/cash/sessions', 'cash.manage', null, async (s) => listCashSessions(s));
-  route('GET', '/cash/active', 'payment.receive', null, async (s) =>
-    s.list('cash_sessions', sql`status='OPEN'`),
-  );
+  route('GET', '/cash/active', 'payment.receive', null, async (s) => activeCashSessions(s));
   route(
     'POST',
     '/cash/sessions',

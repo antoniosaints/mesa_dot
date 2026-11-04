@@ -2,6 +2,7 @@ import { prepareBranchTransition } from './branch-transition.js';
 import { PageLoading } from './page-loading.js';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useInterfaceSurface } from './interface-scope.js';
 import { Building2, Check, ChevronDown, Plus, RefreshCw, Search } from 'lucide-react';
 import { api, session, storeBranchSession, type Data } from './client.js';
 import { Brand } from './appearance.js';
@@ -30,6 +31,7 @@ function BranchImage({ branch }: { branch: Data }) {
   );
 }
 export function BranchSwitcher() {
+  const interfaceSurface = useInterfaceSurface();
   const [data, setData] = useState<Data | null>(null),
     [error, setError] = useState(''),
     [open, setOpen] = useState(false),
@@ -166,7 +168,7 @@ export function BranchSwitcher() {
             ref={panel}
             role="menu"
             aria-label="Selecionar filial"
-            className="branch-menu"
+            className={['branch-menu', interfaceSurface].filter(Boolean).join(' ')}
             style={position}
             onKeyDown={(event) => {
               const buttons = [

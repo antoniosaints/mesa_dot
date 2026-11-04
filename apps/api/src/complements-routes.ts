@@ -1,3 +1,4 @@
+import { paymentHttpSchema } from './payment-http-schema.js';
 import type { FastifyInstance, FastifyRequest, HTTPMethods } from 'fastify';
 import { z } from 'zod';
 import { Redis } from 'ioredis';
@@ -32,7 +33,6 @@ import {
   oauthState,
   prepareMercado,
   testMercado,
-  mercadoRequest,
   mercadoPayment,
   verifyMercadoSignature,
 } from './mercadopago.js';
@@ -44,7 +44,7 @@ import {
   testGemini,
   askGemini,
 } from './gemini.js';
-import { reconcileMercadoPayment } from './payments.js';
+import { applyMercadoObservation, syncMercadoIntent } from './mercado-financial.js';
 const empty = z.object({}).strict();
 const providerSchema = z.enum(['mercadopago', 'gemini']);
 const keySchema = geminiConfigSchema.pick({ api_key: true });
@@ -97,35 +97,32 @@ export function registerComplements(app: FastifyInstance, dependencies: Dependen
   });
   assistantLock.on('error', () => {});
   app.addHook('onClose', async () => assistantLock.disconnect());
-  // Durable refresh before financial transactions prevents losing rotated credentials on rollback.
+  const checkedMercado = new WeakMap<FastifyRequest, Row>();
   app.addHook('preHandler', async (request) => {
     const path = request.url.split('?')[0];
     if (
       request.method !== 'POST' ||
-      !(
-        /^\/api\/v1\/payments\/(intents(?:\/[a-f0-9-]+\/sync)?|[a-f0-9-]+\/refund)$/.test(path) ||
-        /^\/api\/v1\/complements\/mercadopago\/(test|enable)$/.test(path)
-      )
+      !/^\/api\/v1\/complements\/mercadopago\/(test|enable)$/.test(path)
     )
       return;
     const current = await actor(request);
-    const s = view(current);
-    if (path.endsWith('/refund'))
-      ensure(
-        current.kind === 'STAFF' && current.permissions.includes('payment.refund'),
-        'FORBIDDEN',
-        'Sem permissão para estornar.',
-        403,
-      );
-    else if (path.includes('/complements/')) complementAdmin(s);
-    else {
-      const orderId = path.endsWith('/sync')
-        ? (await s.get('payment_intents', uuid.parse(path.split('/')[5]))).order_id
-        : uuid.parse((request.body as Row)?.order_id);
-      await accessOrder(s, orderId);
-    }
+    complementAdmin(view(current));
     await prepareMercado(current);
+    checkedMercado.set(request, await testMercado(view(current)));
   });
+  async function recordMercadoTest(s: Scope, request: FastifyRequest) {
+    complementAdmin(s);
+    const checked = checkedMercado.get(request),
+      connection = await complement(s, 'mercadopago');
+    ensure(
+      checked && connection?.credentials && hash(connection.credentials) === checked.fingerprint,
+      'CONFLICT',
+      'A conexão foi alterada. Teste novamente.',
+      409,
+    );
+    await saveComplement(s, 'mercadopago', { last_checked_at: new Date() });
+    return { connected: true, account_id: checked.account_id };
+  }
   route('GET', '/complements', null, null, safeCatalog);
   route('POST', '/complements/:provider/install', null, empty, async (s, _body, request) => {
     complementAdmin(s);
@@ -152,7 +149,7 @@ export function registerComplements(app: FastifyInstance, dependencies: Dependen
             'A aplicação OAuth do SaaS não está configurada.',
             409,
           );
-          await testMercado(s);
+          await recordMercadoTest(s, request);
         } else await testGemini(s);
       }
       await saveComplement(s, id, { enabled: action === 'enable' });
@@ -177,7 +174,9 @@ export function registerComplements(app: FastifyInstance, dependencies: Dependen
     await s.audit('complement.key_removed', record.id, { provider: 'gemini' });
     return { removed: true };
   });
-  route('POST', '/complements/mercadopago/test', null, empty, testMercado);
+  route('POST', '/complements/mercadopago/test', null, empty, (s, _body, request) =>
+    recordMercadoTest(s, request),
+  );
   app.post(
     '/api/v1/complements/gemini/ask',
     {
@@ -324,15 +323,8 @@ export function registerComplements(app: FastifyInstance, dependencies: Dependen
     };
     let result = 'error';
     try {
-      result = (
-        await atomic(
-          current,
-          'mp-callback:' + pending.id,
-          'complement.mercadopago.callback',
-          { state: pending.id },
-          (s) => completeMercado(s, pending.id, input.code, Boolean(input.error)),
-        )
-      ).result;
+      result = (await completeMercado(current, pending.id, input.code, Boolean(input.error)))
+        .result;
     } catch {
       /* No authorization code, token or provider response is exposed in the redirect. */
     }
@@ -364,37 +356,10 @@ export function registerComplements(app: FastifyInstance, dependencies: Dependen
       requires_review: payments.find((payment) => payment.review_reason)?.review_reason ?? null,
     };
   });
-  route('POST', '/payments/intents/:id/sync', null, empty, async (s, _body, request) => {
-    const record = await s.get('payment_intents', uuid.parse((request.params as Row).id));
-    await accessOrder(s, record.order_id);
-    ensure(
-      record.provider === 'mercadopago',
-      'INVALID_STATE',
-      'Esta intenção não pertence ao Mercado Pago.',
-      409,
-    );
-    const query = new URLSearchParams({
-      external_reference: record.provider_reference,
-      sort: 'date_created',
-      criteria: 'desc',
-      limit: '20',
-    });
-    const found = await mercadoRequest(
-      s,
-      '/v1/payments/search?' + query.toString(),
-      {},
-      record.external_account_id,
-    );
-    for (const payment of Array.isArray(found.results) ? found.results : [])
-      await reconcileMercadoPayment(
-        s,
-        await mercadoPayment(s, String(payment.id), record.external_account_id),
-      );
-    const payments = await s.list('payments', sql`intent_id=${record.id}`);
-    return {
-      status: (await s.get('payment_intents', record.id)).status,
-      requires_review: payments.find((payment) => payment.review_reason)?.review_reason ?? null,
-    };
+  app.post('/api/v1/payments/intents/:id/sync', paymentHttpSchema(empty), async (request) => {
+    const current = await actor(request);
+    empty.parse(request.body);
+    return syncMercadoIntent(current, uuid.parse((request.params as Row).id), true, key(request));
   });
   app.post('/api/v1/webhooks/payments/mercadopago', async (request) => {
     const query = request.query as Row,
@@ -433,20 +398,6 @@ export function registerComplements(app: FastifyInstance, dependencies: Dependen
       );
     const target = publicActor(units[0]);
     await prepareMercado(target);
-    return atomic(
-      target,
-      'mp:' +
-        hash(
-          JSON.stringify([
-            payment.id,
-            payment.status,
-            payment.date_last_updated,
-            payment.refunds ?? [],
-          ]),
-        ),
-      'payment.mercadopago.webhook',
-      { payment_id: paymentId },
-      (s) => reconcileMercadoPayment(s, payment),
-    );
+    return applyMercadoObservation(target, payment);
   });
 }

@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { useInterfaceSurface } from './interface-scope.js';
 import { useLocation, useNavigate } from 'react-router';
 import {
   Sparkles,
@@ -69,6 +70,7 @@ export function AiAssistantProvider({
   );
 }
 function AssistantSession({ children, scopeKey }: { children: ReactNode; scopeKey: string }) {
+  const interfaceSurface = useInterfaceSurface();
   const [connection, setConnection] = useState<Data | null>(null),
     [open, setOpen] = useState(false),
     [unread, setUnread] = useState(false);
@@ -298,7 +300,7 @@ function AssistantSession({ children, scopeKey }: { children: ReactNode; scopeKe
       {open && (
         <section
           id="mesa-ai-chat"
-          className="ai-chat-panel"
+          className={['ai-chat-panel', interfaceSurface].filter(Boolean).join(' ')}
           style={{
             maxHeight: Math.max(120, viewport.height - 24),
             minHeight: Math.min(280, Math.max(120, viewport.height - 24)),

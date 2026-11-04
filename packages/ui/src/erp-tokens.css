@@ -1,0 +1,83 @@
+/* Foundation shared by the management layout and its portals. No tokens are
+   attached to the document root: the current UI and other apps keep their theme. */
+.mesa-erp,
+.mesa-erp-surface,
+body:has(.mesa-erp) .toast-region {
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --radius-control: 8px;
+  --radius-card: 12px;
+  --radius-modal: 16px;
+  --control-height: 40px;
+  --control-height-compact: 36px;
+  --control-height-touch: 44px;
+  --layout-gap: 12px;
+  --page-gutter: 20px;
+  --motion-fast: 120ms;
+  --motion-enter: 180ms;
+  --motion-ease: cubic-bezier(0.2, 0, 0, 1);
+  --shadow-button: inset 0 1px 0 #ffffff18, inset 0 -1px 0 #0004, 0 1px 2px #0005;
+  --shadow-button-hover: inset 0 1px 0 #ffffff24, inset 0 -1px 0 #0005, 0 2px 4px #0005;
+  --shadow-button-pressed: inset 0 1px 3px #0006, 0 0 0 transparent;
+  --text-caption: 12px;
+  --text-label: 13px;
+  --text-body: 14px;
+  --color-bg: #090e1a;
+  --color-surface: #0e1525;
+  --color-surface-subtle: #131e32;
+  --color-text: #e2e8f0;
+  --color-text-secondary: #a8b6ca;
+  --color-border: #27364c;
+  --color-control-border: #677990;
+  --color-brand: var(--blue);
+  --color-on-brand: var(--on-primary);
+  --color-brand-ink: var(--accent-ink);
+  --accent-ink: var(--erp-accent-ink);
+  --color-success: #5ee6b3;
+  --color-success-bg: #10372d;
+  --color-warning: #fcd980;
+  --color-warning-bg: #352b14;
+  --color-danger: #fda4af;
+  --color-danger-bg: #391c28;
+  --color-info: #9ac1ff;
+  --color-info-bg: #172d51;
+  --bg: var(--color-bg);
+  --panel: var(--color-surface);
+  --panel-hover: var(--color-surface-subtle);
+  --input: var(--color-surface-subtle);
+  --text: var(--color-text);
+  --muted: var(--color-text-secondary);
+  --line: var(--color-border);
+  --green: var(--color-success);
+  --green-bg: var(--color-success-bg);
+  --amber: var(--color-warning);
+  --amber-bg: var(--color-warning-bg);
+  --red: var(--color-danger);
+  --red-bg: var(--color-danger-bg);
+  color: var(--color-text);
+}
+:root[data-theme='light'] :is(.mesa-erp, .mesa-erp-surface),
+:root[data-theme='light'] body:has(.mesa-erp) .toast-region {
+  --color-bg: #f5f7fb;
+  --color-surface: #fff;
+  --color-surface-subtle: #f8fafc;
+  --color-text: #17243b;
+  --color-text-secondary: #52637a;
+  --color-border: #dce4ef;
+  --color-control-border: #7a899d;
+  --color-success: #06734f;
+  --color-success-bg: #dff7ec;
+  --color-warning: #805400;
+  --color-warning-bg: #fff3cf;
+  --color-danger: #b42335;
+  --color-danger-bg: #fff0f1;
+  --color-info: #0757f9;
+  --color-info-bg: #eaf0ff;
+  --shadow-button: inset 0 1px 0 #fff, inset 0 -1px 0 #17243b12, 0 1px 2px #17243b18;
+  --shadow-button-hover: inset 0 1px 0 #fff, inset 0 -1px 0 #17243b20, 0 2px 4px #17243b20;
+  --shadow-button-pressed: inset 0 1px 3px #17243b26, 0 0 0 transparent;
+}

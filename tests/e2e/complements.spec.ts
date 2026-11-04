@@ -1,3 +1,4 @@
+import { expectMobileModalLayout } from './modal-layout.js';
 import { test } from './test.js';
 import { expect, type Page } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
@@ -198,6 +199,7 @@ test('catálogo e configuração cabem no mobile e no dark sem rolagem horizonta
         .click();
       const modal = page.getByRole('dialog', { name: 'Complemento · Gemini', exact: true });
       await expect(modal).toBeVisible();
+      await expectMobileModalLayout(modal);
       expect(await modal.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
       await page.screenshot({
         path: '.local/screenshots/complements-config-' + width + '-' + theme + '.png',

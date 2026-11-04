@@ -5,8 +5,12 @@ export default defineConfig({
   plugins: [tenantPwa('customer'), react()],
   server: {
     proxy: {
-      '/api': process.env.API_PROXY_TARGET ?? 'http://127.0.0.1:3000',
-      '/socket.io': { target: process.env.API_PROXY_TARGET ?? 'http://127.0.0.1:3000', ws: true },
+      '/api': { target: process.env.API_PROXY_TARGET ?? 'http://127.0.0.1:3000', xfwd: true },
+      '/socket.io': {
+        target: process.env.API_PROXY_TARGET ?? 'http://127.0.0.1:3000',
+        ws: true,
+        xfwd: true,
+      },
     },
   },
   build: { outDir: 'dist' },

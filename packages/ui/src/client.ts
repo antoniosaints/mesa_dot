@@ -109,6 +109,7 @@ export async function api(
   key: string = crypto.randomUUID(),
   responseType: 'json' | 'blob' = 'json',
   signal?: AbortSignal,
+  visitorToken?: string,
 ): Promise<any> {
   const send = () =>
     fetch(`${base}${path}`, {
@@ -117,7 +118,9 @@ export async function api(
       headers: {
         ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
         ...expectedUnitHeaders(),
-        ...(session()?.token ? { Authorization: `Bearer ${session()!.token}` } : {}),
+        ...((visitorToken ?? session()?.token)
+          ? { Authorization: `Bearer ${visitorToken ?? session()!.token}` }
+          : {}),
         'Idempotency-Key': key,
       },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
@@ -125,7 +128,12 @@ export async function api(
     });
   const attemptedToken = session()?.token;
   let response = await send();
-  if (response.status === 401 && session()?.refresh_token && !path.startsWith('/auth/')) {
+  if (
+    visitorToken === undefined &&
+    response.status === 401 &&
+    session()?.refresh_token &&
+    !path.startsWith('/auth/')
+  ) {
     if ((session()?.token && session()?.token !== attemptedToken) || (await refreshStaffSession()))
       response = await send();
   }
@@ -137,6 +145,10 @@ export async function api(
       { code: value.error?.code },
     );
   return value;
+}
+/** Read or operate a saved visitor session without changing the active ordering context. */
+export function visitorApi(path: string, token: string, body?: unknown) {
+  return api(path, body, undefined, crypto.randomUUID(), 'json', undefined, token);
 }
 export function subscribe(onChange: () => void) {
   const socket = io(import.meta.env.VITE_API_URL ?? window.location.origin, {

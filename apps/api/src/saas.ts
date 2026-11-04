@@ -277,6 +277,19 @@ export async function registerSaas(route: Registrar) {
       s.tx,
       sql`SELECT status,COUNT(*) count FROM print_jobs WHERE ${s.where()} GROUP BY status`,
     );
-    return { outbox: outbox[0], printing: print };
+    const gateway = await rows(
+      s.tx,
+      sql`SELECT state,COUNT(*) count,MAX(attempts) max_attempts FROM gateway_operations WHERE ${s.where(sql`kind IN ('CHECKOUT','REFUND') AND state<>'COMPLETED'`)} GROUP BY state`,
+    );
+    const reconciliation = await rows(
+      s.tx,
+      sql`SELECT COUNT(*) watched,SUM(last_error IS NOT NULL) errors,MIN(last_checked_at) oldest_check FROM payment_reconciliation WHERE ${s.where(sql`watch_until>UTC_TIMESTAMP(3)`)}`,
+    );
+    return {
+      outbox: outbox[0],
+      printing: print,
+      gateway_operations: gateway,
+      payment_reconciliation: reconciliation[0],
+    };
   });
 }

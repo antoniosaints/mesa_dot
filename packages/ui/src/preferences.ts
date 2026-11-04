@@ -1,5 +1,6 @@
 import { pwaContext, tenantStorageKey } from './pwa-context.js';
 export type Theme = 'dark' | 'light';
+export type InterfaceStyle = 'classic' | 'erp';
 export const defaultPrimary = '#2584f8';
 export const defaultSidebar = '#0d1b2a';
 export const appearancePresets = [
@@ -60,12 +61,17 @@ export function sidebarPalette(background: string) {
     border: mixColor(background, ink, 0.18),
   };
 }
-export function readableAccent(color: string, theme: Theme) {
-  const background = theme === 'dark' ? '#090e1a' : '#f3f6fb';
-  if (contrast(color, background) >= 4.5) return color;
+export function readableAccent(
+  color: string,
+  theme: Theme,
+  backgrounds = [theme === 'dark' ? '#090e1a' : '#f3f6fb'],
+) {
+  const readable = (candidate: string) =>
+    backgrounds.every((background) => contrast(candidate, background) >= 4.5);
+  if (readable(color)) return color;
   for (let step = 1; step <= 20; step++) {
     const candidate = mixColor(color, theme === 'dark' ? '#ffffff' : '#000000', step / 20);
-    if (contrast(candidate, background) >= 4.5) return candidate;
+    if (readable(candidate)) return candidate;
   }
   return theme === 'dark' ? '#ffffff' : '#000000';
 }
@@ -74,6 +80,10 @@ function readSaved() {
     return {
       theme:
         localStorage.getItem('mesa-theme') === 'light' ? ('light' as Theme) : ('dark' as Theme),
+      interfaceStyle:
+        localStorage.getItem('mesa-interface') === 'erp'
+          ? ('erp' as InterfaceStyle)
+          : ('classic' as InterfaceStyle),
       primary: validColor(localStorage.getItem(tenantStorageKey('mesa-primary')) ?? '')
         ? localStorage.getItem(tenantStorageKey('mesa-primary'))!
         : defaultPrimary,
@@ -82,7 +92,12 @@ function readSaved() {
         : defaultSidebar,
     };
   } catch {
-    return { theme: 'dark' as Theme, primary: defaultPrimary, sidebar: defaultSidebar };
+    return {
+      theme: 'dark' as Theme,
+      interfaceStyle: 'classic' as InterfaceStyle,
+      primary: defaultPrimary,
+      sidebar: defaultSidebar,
+    };
   }
 }
 let state = {
@@ -101,6 +116,7 @@ function apply() {
   if (typeof document === 'undefined') return;
   const root = document.documentElement;
   root.dataset.theme = state.theme;
+  root.dataset.interface = state.interfaceStyle;
   root.style.colorScheme = state.theme;
   const sidebar = sidebarPalette(state.sidebar);
   const tokens = {
@@ -111,6 +127,13 @@ function apply() {
     '--primary-border': `${state.primary}66`,
     '--on-primary': primaryForeground(state.primary),
     '--accent-ink': readableAccent(state.primary, state.theme),
+    '--erp-accent-ink': readableAccent(
+      state.primary,
+      state.theme,
+      state.theme === 'dark'
+        ? ['#090e1a', '#0e1525', '#131e32']
+        : ['#f5f7fb', '#ffffff', '#f8fafc'],
+    ),
     '--brand-start': mixColor(state.primary, '#ffffff', 0.15),
     '--brand-end': mixColor(state.primary, '#000000', 0.18),
     '--sidebar-bg': sidebar.background,
@@ -126,6 +149,7 @@ apply();
 function update(next: typeof state) {
   if (
     next.theme === state.theme &&
+    next.interfaceStyle === state.interfaceStyle &&
     next.primary === state.primary &&
     next.sidebar === state.sidebar
   )
@@ -133,6 +157,7 @@ function update(next: typeof state) {
   state = next;
   try {
     localStorage.setItem('mesa-theme', state.theme);
+    localStorage.setItem('mesa-interface', state.interfaceStyle);
     localStorage.setItem(tenantStorageKey('mesa-primary'), state.primary);
     localStorage.setItem(tenantStorageKey('mesa-sidebar-color'), state.sidebar);
   } catch {
@@ -150,6 +175,7 @@ export const appearanceStore = {
   },
   getSnapshot: () => state,
   setTheme: (theme: Theme) => update({ ...state, theme }),
+  setInterfaceStyle: (interfaceStyle: InterfaceStyle) => update({ ...state, interfaceStyle }),
   setPrimary: (primary: string) => {
     if (validColor(primary)) update({ ...state, primary: primary.toLowerCase() });
   },

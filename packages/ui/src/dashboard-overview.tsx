@@ -11,13 +11,14 @@ import {
   TriangleAlert,
 } from 'lucide-react';
 import { api, brl, session, type Data } from './client.js';
-import { Icon, type IconName } from './appearance.js';
+import { Icon, useAppearance, type IconName } from './appearance.js';
 import { Badge, Empty, useRefresh } from './common.js';
 import { TableLoading } from './pagination.js';
 import { financeChange, financeDay } from './finance-format.js';
 import { operationTime, shortId } from './operation-format.js';
 import { CustomerLinkPanel } from './customer-link-panel.js';
 import { AiSummaryButton } from './ai-assistant.js';
+import { StatCard, ChartCard } from './data-display.js';
 import './dashboard-overview.css';
 
 function Kpi({
@@ -34,26 +35,25 @@ function Kpi({
   tone?: string;
 }) {
   return (
-    <section className={'overview-kpi ' + tone}>
-      <span className="overview-kpi-icon">
-        <Icon name={icon} size={20} />
-      </span>
-      <div>
-        <span>{label}</span>
-        <strong>{value}</strong>
-        <small>{detail}</small>
-      </div>
-    </section>
+    <StatCard
+      className="overview-kpi"
+      iconClassName="overview-kpi-icon"
+      label={label}
+      value={value}
+      detail={detail}
+      icon={<Icon name={icon} size={20} />}
+      tone={tone}
+    />
   );
 }
 function Occupancy({ tables }: { tables: Data }) {
   const ratio = tables.total ? Math.round((tables.occupied / tables.total) * 100) : 0;
   return (
-    <section className="panel overview-occupancy">
-      <div className="section-head">
-        <h2>Ocupação do salão</h2>
-        <span className="overview-live">Agora</span>
-      </div>
+    <ChartCard
+      className="overview-occupancy"
+      title="Ocupação do salão"
+      action={<span className="overview-live">Agora</span>}
+    >
       <div
         className="overview-ring"
         role="img"
@@ -79,7 +79,7 @@ function Occupancy({ tables }: { tables: Data }) {
           Em fechamento <b>{tables.closing}</b>
         </span>
       </div>
-    </section>
+    </ChartCard>
   );
 }
 function OrderChart({ data }: { data: Data }) {
@@ -105,18 +105,16 @@ function OrderChart({ data }: { data: Data }) {
   const [selected, setSelected] = useState<{ label: string; count: number } | null>(null);
   useEffect(() => setSelected(null), [data.period.start, data.period.end]);
   return (
-    <section className="panel overview-orders-chart">
-      <div className="section-head">
-        <div>
-          <h2>Ritmo dos pedidos</h2>
-          <p className="muted small">
-            Confirmados por {data.period.bucket === 'hour' ? 'hora' : 'dia'} · horário de Brasília
-          </p>
-        </div>
+    <ChartCard
+      className="overview-orders-chart"
+      title="Ritmo dos pedidos"
+      description={`Confirmados por ${data.period.bucket === 'hour' ? 'hora' : 'dia'} · horário de Brasília`}
+      action={
         <strong>
           {data.orders.confirmed} <small>pedidos</small>
         </strong>
-      </div>
+      }
+    >
       {data.orders.confirmed ? (
         <>
           <div className="overview-chart-scroll">
@@ -154,7 +152,7 @@ function OrderChart({ data }: { data: Data }) {
       ) : (
         <Empty>Nenhum pedido confirmado neste período.</Empty>
       )}
-    </section>
+    </ChartCard>
   );
 }
 export function DashboardOverview({
@@ -164,6 +162,7 @@ export function DashboardOverview({
   scopeKey: string;
   onOpen: (path: string) => void;
 }) {
+  const { interfaceStyle } = useAppearance();
   const today = financeDay();
   const [dates, setDates] = useState({ start: today, end: today });
   const [draft, setDraft] = useState(dates),
@@ -287,6 +286,30 @@ export function DashboardOverview({
           : []),
       ]
     : [];
+  const attention = alerts.length ? (
+    <section className="panel overview-alerts">
+      <div className="section-head">
+        <h2>
+          <TriangleAlert size={18} />O que precisa de atenção
+        </h2>
+        <span>{alerts.length} ponto(s)</span>
+      </div>
+      {alerts.map((alert) => (
+        <button type="button" key={alert.path + alert.title} onClick={() => onOpen(alert.path)}>
+          <span>
+            <strong>{alert.title}</strong>
+            <small>{alert.detail}</small>
+          </span>
+          <ArrowRight size={17} />
+        </button>
+      ))}
+    </section>
+  ) : (
+    <div className="overview-clear">
+      <CircleCheck size={18} />
+      Nenhuma pendência de atenção nas áreas que seu perfil pode consultar.
+    </div>
+  );
   return (
     <div className="overview-workspace">
       <section className="panel overview-toolbar">
@@ -422,6 +445,7 @@ export function DashboardOverview({
             Atualização automática · {operationTime(data.generated_at)}
             <small>Pendências e ocupação mostram o momento atual.</small>
           </div>
+          {interfaceStyle === 'erp' && attention}
           {data.financial && (
             <>
               <div className="overview-section-title">
@@ -505,34 +529,7 @@ export function DashboardOverview({
               />
             )}
           </div>
-          {alerts.length ? (
-            <section className="panel overview-alerts">
-              <div className="section-head">
-                <h2>
-                  <TriangleAlert size={18} />O que precisa de atenção
-                </h2>
-                <span>{alerts.length} ponto(s)</span>
-              </div>
-              {alerts.map((alert) => (
-                <button
-                  type="button"
-                  key={alert.path + alert.title}
-                  onClick={() => onOpen(alert.path)}
-                >
-                  <span>
-                    <strong>{alert.title}</strong>
-                    <small>{alert.detail}</small>
-                  </span>
-                  <ArrowRight size={17} />
-                </button>
-              ))}
-            </section>
-          ) : (
-            <div className="overview-clear">
-              <CircleCheck size={18} />
-              Nenhuma pendência de atenção nas áreas que seu perfil pode consultar.
-            </div>
-          )}
+          {interfaceStyle !== 'erp' && attention}
           {(data.orders || data.tables) && (
             <div className={'overview-charts ' + (!data.tables || !data.orders ? 'single' : '')}>
               {data.orders && <OrderChart data={data} />}
@@ -631,7 +628,11 @@ export function DashboardOverview({
               </div>
               {data.tables.attendances.length ? (
                 <div className="data-table">
-                  <table>
+                  <table
+                    className="mobile-card-table"
+                    role="table"
+                    aria-label="Mesas em atendimento"
+                  >
                     <thead>
                       <tr>
                         <th>Mesa</th>
@@ -656,20 +657,20 @@ export function DashboardOverview({
                         );
                         return (
                           <tr key={item.id}>
-                            <td>
+                            <td data-label="Mesa">
                               <strong>Mesa {item.number}</strong>
                             </td>
-                            <td>
+                            <td data-label="Tempo de atendimento">
                               <Clock3 size={13} />{' '}
                               {minutes >= 60
                                 ? `${Math.floor(minutes / 60)}h ${minutes % 60}min`
                                 : `${minutes}min`}
                             </td>
-                            <td>{item.tabs}</td>
-                            <td>
+                            <td data-label="Comandas abertas">{item.tabs}</td>
+                            <td data-label="Situação">
                               <Badge status={item.status} />
                             </td>
-                            <td>
+                            <td data-label="Ações">
                               <button
                                 type="button"
                                 onClick={() => onOpen('/salao/atendimento/' + item.table_id)}

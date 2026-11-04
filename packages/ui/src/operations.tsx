@@ -358,16 +358,16 @@ export function OrdersWorkspace({
       </header>
       <div className="orders-metrics" aria-label="Indicadores dos pedidos">
         {metrics.map((metric) => (
-          <article className={'orders-metric ' + metric.tone} key={metric.label}>
-            <span className="orders-metric-icon">
-              <Icon name={metric.icon as 'orders'} size={20} />
-            </span>
-            <div>
-              <span>{metric.label}</span>
-              <strong>{loading ? '—' : metric.value}</strong>
-              <small>{metric.detail}</small>
-            </div>
-          </article>
+          <StatCard
+            as="article"
+            className={'orders-metric ' + metric.tone}
+            key={metric.label}
+            iconClassName="orders-metric-icon"
+            label={metric.label}
+            value={loading ? '—' : metric.value}
+            detail={metric.detail}
+            icon={<Icon name={metric.icon as 'orders'} size={20} />}
+          />
         ))}
       </div>
       <section className="orders-panel">
@@ -600,3 +600,4 @@ export function OrdersWorkspace({
     </div>
   );
 }
+import { StatCard } from './data-display.js';

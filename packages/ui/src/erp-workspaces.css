@@ -1,0 +1,554 @@
+/* Module compositions share the same components while retaining their existing
+   breakpoints, query state, business actions and mobile card/table adapters. */
+.mesa-erp
+  :is(
+    .orders-workspace,
+    .payments-workspace,
+    .cash-workspace,
+    .team-workspace,
+    .production-workspace,
+    .finance-workspace,
+    .business-settings-workspace
+  ) {
+  gap: var(--layout-gap);
+}
+.mesa-erp :is(.cash-heading, .orders-page-heading, .finance-heading, .module-page-title) {
+  gap: 12px;
+  margin-bottom: 0;
+  align-items: center;
+}
+.mesa-erp :is(.cash-heading, .orders-page-heading, .finance-heading, .module-page-title) h1 {
+  font-size: 27px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.mesa-erp :is(.cash-heading, .orders-page-heading, .finance-heading, .module-page-title) p {
+  font-size: 13px;
+  line-height: 1.6;
+}
+.mesa-erp :is(.cash-heading, .orders-page-heading, .finance-heading, .module-page-title) .eyebrow {
+  font-size: 11px;
+  letter-spacing: 1.4px;
+}
+.mesa-erp :is(.orders-metrics, .payments-kpis, .cash-kpis, .team-kpis, .production-kpis) {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.mesa-erp .stat-card.green .stat-card-icon,
+.mesa-erp .stat-card.teal .stat-card-icon {
+  color: var(--green);
+  background: var(--green-bg);
+}
+.mesa-erp .stat-card.red .stat-card-icon {
+  color: var(--red);
+  background: var(--red-bg);
+}
+.mesa-erp .stat-card.amber .stat-card-icon {
+  color: var(--amber);
+  background: var(--amber-bg);
+}
+.mesa-erp .stat-card.blue .stat-card-icon {
+  color: var(--color-brand-ink);
+  background: var(--soft-blue);
+}
+.mesa-erp
+  :is(
+    .orders-panel,
+    .catalog-layout,
+    .catalog-products-panel,
+    .finance-records,
+    .payments-panel,
+    .team-directory,
+    .inventory-overview,
+    .print-queue-panel
+  ) {
+  border-radius: var(--radius-card);
+  border-color: var(--color-border);
+  background: var(--color-surface);
+}
+.mesa-erp
+  :is(
+    .orders-panel-heading,
+    .payments-list-heading,
+    .team-list-heading,
+    .production-list-heading,
+    .cash-section-heading
+  ) {
+  gap: 16px;
+}
+.mesa-erp
+  :is(
+    .orders-panel-heading,
+    .payments-list-heading,
+    .team-list-heading,
+    .production-list-heading,
+    .cash-section-heading
+  )
+  h2 {
+  font-size: 16px;
+  font-weight: 700;
+}
+.mesa-erp
+  :is(
+    .orders-panel-heading,
+    .payments-list-heading,
+    .team-list-heading,
+    .production-list-heading,
+    .cash-section-heading
+  )
+  p {
+  font-size: 12px;
+  line-height: 1.6;
+}
+.mesa-erp
+  :is(
+    .orders-filter-area,
+    .payments-filters,
+    .team-filters,
+    .production-filters,
+    .cash-filter-grid,
+    .finance-list-filters,
+    .product-config-filters
+  ) {
+  gap: 12px;
+}
+.mesa-erp
+  :is(
+    .orders-filter-area,
+    .payments-filters,
+    .team-filters,
+    .production-filters,
+    .cash-filter-grid,
+    .finance-list-filters,
+    .product-config-filters
+  )
+  label {
+  font-size: 12px;
+}
+.mesa-erp
+  :is(
+    .order-search,
+    .payments-search-control,
+    .team-search-control,
+    .production-search-control,
+    .catalog-search,
+    .list-toolbar .input-icon
+  ) {
+  border-radius: var(--radius-control);
+  border-color: var(--color-control-border);
+  background: var(--color-surface-subtle);
+}
+.mesa-erp
+  :is(
+    .orders-panel-heading,
+    .orders-panel-controls,
+    .catalog-list-toolbar,
+    .payments-list-heading,
+    .team-list-heading
+  ) {
+  min-width: 0;
+}
+.mesa-erp :is(.catalog-toolbar, .catalog-list-toolbar) {
+  gap: 12px;
+}
+.mesa-erp .catalog-page {
+  gap: 12px 16px;
+}
+.mesa-erp .catalog-page > .page-title {
+  margin: 0;
+}
+/* Inventory is a normal block flow, so it needs its own single section gap. */
+.mesa-erp .inventory-workspace > .module-page-title {
+  margin-bottom: var(--layout-gap);
+}
+/* Keep dense workspaces readable without stacking title margins and grid gaps. */
+.mesa-erp :is(.payments-panel, .cash-panel, .print-queue-panel, .resource-panel) {
+  padding: 16px;
+}
+.mesa-erp :is(.payments-list-heading, .team-list-heading, .production-list-heading) {
+  margin-bottom: 10px;
+}
+.mesa-erp .payments-list-heading .field-hint {
+  margin-top: 4px;
+}
+.mesa-erp .payments-results-bar {
+  margin-block: 10px;
+}
+.mesa-erp .catalog-categories-panel {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+}
+.mesa-erp .catalog-categories-panel h2 {
+  font-size: 15px;
+  font-weight: 700;
+}
+.mesa-erp .catalog-category-button {
+  border-radius: 8px;
+  min-height: 40px;
+}
+.mesa-erp .catalog-thumbnail {
+  border-radius: 10px;
+}
+.mesa-erp .catalog-row-actions {
+  justify-content: flex-end;
+  gap: 8px;
+}
+.mesa-erp .catalog-product-identity {
+  gap: 12px;
+}
+.mesa-erp .catalog-product-price {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.mesa-erp .catalog-switch {
+  min-height: 24px;
+}
+.mesa-erp .inventory-card-table .numeric,
+.mesa-erp .payments-table .numeric,
+.mesa-erp .finance-records .numeric {
+  font-variant-numeric: tabular-nums;
+}
+.mesa-erp :is(.finance-period, .finance-cash, .finance-quick, .finance-flow) {
+  border-radius: 12px;
+}
+.mesa-erp .finance-workspace {
+  container: finance / inline-size;
+}
+.mesa-erp .finance-workspace .finance-period {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 12px;
+  padding: 10px 12px;
+  align-items: end;
+}
+.mesa-erp .finance-period > label {
+  width: auto;
+  min-width: 0;
+  gap: 4px;
+  margin: 0;
+}
+.mesa-erp .finance-period > .finance-unit {
+  grid-column: 2;
+  grid-row: 1;
+}
+.mesa-erp .finance-period form {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
+  align-items: end;
+  gap: 8px;
+  width: 100%;
+}
+.mesa-erp .finance-period form > label {
+  min-width: 0;
+  gap: 4px;
+}
+.mesa-erp .finance-period :is(input, select, .search-select) {
+  width: 100%;
+  min-width: 0;
+}
+.mesa-erp .finance-period form > button {
+  grid-column: auto;
+}
+/* Finance has five metrics. Use the available content width (including the
+   open/collapsed sidebar), rather than the shared four-metric grid. */
+.mesa-erp .finance-kpis {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.mesa-erp .finance-kpis > .finance-kpi {
+  grid-column: auto;
+}
+.mesa-erp .finance-kpis > .finance-kpi:last-child {
+  grid-column: 1 / -1;
+}
+.mesa-erp .finance-kpi .stat-card-value {
+  overflow-wrap: anywhere;
+}
+@container finance (min-width: 600px) {
+  .mesa-erp .finance-kpis {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+  .mesa-erp .finance-kpis > .finance-kpi {
+    grid-column: span 2;
+  }
+  .mesa-erp .finance-kpis > .finance-kpi:nth-last-child(-n + 2) {
+    grid-column: span 3;
+  }
+}
+@container finance (min-width: 900px) {
+  .mesa-erp .finance-kpis {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+  .mesa-erp .finance-kpis > .finance-kpi:nth-child(n) {
+    grid-column: auto;
+  }
+}
+@container finance (min-width: 940px) {
+  .mesa-erp .finance-workspace .finance-period {
+    display: flex;
+    align-items: center;
+    flex-wrap: nowrap;
+    padding-block: 8px;
+    gap: 12px;
+  }
+  .mesa-erp .finance-period label {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+    font-size: 12px;
+  }
+  .mesa-erp .finance-period > label:first-child {
+    flex: 0 0 auto;
+  }
+  .mesa-erp .finance-period select {
+    width: 126px;
+  }
+  .mesa-erp .finance-period form {
+    display: flex;
+    align-items: center;
+    flex-wrap: nowrap;
+    width: auto;
+  }
+  .mesa-erp .finance-period input[type='date'] {
+    width: 132px;
+    padding-inline: 8px;
+  }
+  .mesa-erp .finance-period > .finance-unit {
+    margin-left: auto;
+    flex: 0 0 auto;
+  }
+  .mesa-erp .finance-unit .search-select {
+    width: 190px;
+  }
+  .mesa-erp .finance-period :is(input, select, button) {
+    min-height: 36px;
+    font-size: 13px;
+  }
+}
+@container finance (max-width: 479px) {
+  .mesa-erp .finance-period form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .mesa-erp .finance-period form > button {
+    grid-column: 1 / -1;
+  }
+}
+.mesa-erp .finance-card-title {
+  font-size: 16px;
+  font-weight: 700;
+}
+.mesa-erp .finance-reconciliation {
+  gap: 16px;
+}
+.mesa-erp .finance-reconciliation :is(span, small) {
+  font-size: 12px;
+}
+.mesa-erp .finance-accounting-note {
+  font-size: 12px;
+  line-height: 1.6;
+}
+.mesa-erp
+  :is(.cash-operating-note, .team-security-note, .complement-admin-note, .business-public-note) {
+  font-size: 12px;
+  border-radius: 8px;
+  line-height: 1.6;
+}
+.mesa-erp :is(.production-column, .production-job) {
+  border-radius: 12px;
+  border-color: var(--color-border);
+}
+.mesa-erp .production-column {
+  background: var(--color-surface-subtle);
+}
+.mesa-erp .production-job {
+  background: var(--color-surface);
+  padding: 12px;
+}
+.mesa-erp .production-job-product strong {
+  font-size: 14px;
+}
+.mesa-erp
+  :is(.production-job-notes, .production-job-tab, .production-job-time, .production-job-reference) {
+  font-size: 12px;
+}
+.mesa-erp .production-job > button {
+  min-height: 40px;
+}
+.mesa-erp :is(.print-queue-actions, .payment-row-actions, .team-row-actions) {
+  gap: 8px;
+  flex-wrap: wrap;
+}
+@media (min-width: 851px) {
+  .mesa-erp .payments-table.compact-table th:last-child {
+    width: 232px;
+  }
+  .mesa-erp .payment-row-actions {
+    flex-wrap: nowrap;
+  }
+}
+.mesa-erp .business-settings-overview {
+  border-radius: 12px;
+  padding: 16px;
+}
+.mesa-erp
+  :is(
+    .business-setting-card,
+    .pwa-setting-card,
+    .complement-card,
+    .appearance-preview-frame,
+    .appearance-preset
+  ) {
+  border-radius: 12px;
+  border-color: var(--color-border);
+}
+.mesa-erp .complement-card {
+  background: var(--color-surface);
+}
+.mesa-erp :is(.business-settings-details, .push-settings-summary) {
+  font-size: 13px;
+}
+.mesa-erp :is(.floor-legend, .floor-overview-legend) {
+  font-size: 12px;
+}
+.mesa-erp .floor-table {
+  border-radius: 12px;
+}
+.mesa-erp-surface
+  :is(
+    .product-editor-card,
+    .product-price-card,
+    .product-context-card,
+    .table-payment-line,
+    .order-detail-section,
+    .order-ticket-preview,
+    .table-closing-step
+  ) {
+  border-radius: 12px;
+  border-color: var(--color-border);
+}
+.mesa-erp-surface
+  :is(
+    .product-management-note,
+    .product-help,
+    .table-sidebar-section > p,
+    .order-detail-section-heading p,
+    .ticket-group-help
+  ) {
+  font-size: 12px;
+  line-height: 1.6;
+}
+.mesa-erp-surface :is(.table-pane-heading, .order-detail-section-heading) h3 {
+  font-size: 15px;
+}
+.mesa-erp-surface :is(.table-summary-pane, .table-catalog-pane) {
+  background: var(--color-surface-subtle);
+}
+.mesa-erp-surface .table-operation-pane {
+  background: var(--color-surface);
+}
+.mesa-erp-surface .product-overview {
+  gap: 12px;
+}
+.mesa-erp-surface .product-overview strong {
+  font-size: 15px;
+}
+.mesa-erp-surface .product-overview small {
+  font-size: 12px;
+}
+.mesa-erp-surface .product-config-filters {
+  gap: 12px;
+}
+.mesa-erp-surface .mini-ticket {
+  border-radius: 10px;
+}
+.mesa-erp-surface .team-detail-shortcuts,
+.mesa-erp-surface .team-detail-actions {
+  gap: 12px;
+}
+.mesa-erp-surface .team-detail-shortcuts button {
+  min-width: 0;
+  white-space: normal;
+}
+@media (max-width: 1200px) {
+  .mesa-erp :is(.orders-metrics, .payments-kpis, .cash-kpis, .team-kpis, .production-kpis) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 700px) {
+  .mesa-erp
+    :is(
+      .orders-workspace,
+      .payments-workspace,
+      .cash-workspace,
+      .team-workspace,
+      .production-workspace,
+      .finance-workspace,
+      .business-settings-workspace
+    ) {
+    gap: var(--layout-gap);
+  }
+  .mesa-erp :is(.cash-heading, .orders-page-heading, .finance-heading, .module-page-title) {
+    align-items: stretch;
+    gap: 12px;
+    margin-bottom: 0;
+  }
+  .mesa-erp :is(.cash-heading, .orders-page-heading, .finance-heading, .module-page-title) h1 {
+    font-size: 24px;
+  }
+  .mesa-erp
+    :is(.cash-heading, .orders-page-heading, .finance-heading, .module-page-title)
+    > .button-row {
+    width: 100%;
+  }
+  .mesa-erp
+    :is(.cash-heading, .orders-page-heading, .finance-heading, .module-page-title)
+    > .button-row
+    > button {
+    min-width: 0;
+    flex: 1 1 140px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    font-size: 13px;
+  }
+  .mesa-erp :is(.orders-metrics, .payments-kpis, .cash-kpis, .team-kpis, .production-kpis) {
+    gap: 12px;
+  }
+  .mesa-erp :is(.payments-list-heading, .team-list-heading, .production-list-heading) {
+    flex-wrap: wrap;
+  }
+  .mesa-erp
+    :is(
+      .orders-filter-area,
+      .payments-filters,
+      .team-filters,
+      .production-filters,
+      .cash-filter-grid,
+      .finance-list-filters,
+      .product-config-filters
+    )
+    :is(input:not([type='checkbox']), select) {
+    min-height: 44px;
+  }
+  .mesa-erp .catalog-row-actions button {
+    min-width: 40px;
+    min-height: 44px;
+  }
+  .mesa-erp :is(.print-queue-actions, .payment-row-actions) > button {
+    min-height: 44px;
+  }
+  .mesa-erp .team-row-actions > button.icon-button {
+    min-height: 44px;
+    flex-basis: 40px;
+  }
+  .mesa-erp
+    :is(.cash-operating-note, .team-security-note, .complement-admin-note, .business-public-note) {
+    font-size: 12px;
+  }
+  .mesa-erp-surface .team-detail-shortcuts {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,6 +1,7 @@
 import { branchTransitionVisible } from './branch-transition.js';
 import { createPortal } from 'react-dom';
 import { TableLoading } from './pagination.js';
+import { useInterfaceSurface } from './interface-scope.js';
 /** Application transitions fill the viewport; table loaders keep their compact layout. */
 export function PageLoading({
   label = 'Carregando ambiente…',
@@ -9,9 +10,10 @@ export function PageLoading({
   label?: string;
   name?: string;
 }) {
+  const interfaceSurface = useInterfaceSurface();
   if (branchTransitionVisible()) return null;
   return createPortal(
-    <div className="page-loading" aria-busy="true">
+    <div className={'page-loading ' + interfaceSurface} aria-busy="true">
       <div className="page-loading-content">
         {name && <strong className="page-loading-name">{name}</strong>}
         <TableLoading label={label} />

@@ -2,7 +2,7 @@
 
 ## Configuração
 
-Use MySQL 8.4/InnoDB com UTF-8, SQL estrito e relógio sincronizado. A aplicação envia datas UTC e o driver retorna decimais como strings. Apresentação de horários de disponibilidade considera America/Sao_Paulo nesta versão. Sincronize os servidores: a tolerância do webhook é de cinco minutos.
+Use MySQL 8.4/InnoDB com UTF-8, SQL estrito e relógio sincronizado. A aplicação envia datas UTC e o driver retorna decimais como strings. Apresentação de horários de disponibilidade considera America/Sao_Paulo nesta versão. Configure `TRUSTED_PROXIES` conforme os pares reais do proxy, como descrito em [proxy e pagamentos](proxy-e-pagamentos.md). Sincronize os servidores: a tolerância do webhook é de cinco minutos.
 
 A credencial de migration requer DDL no schema. A credencial de execução deve ter SELECT/INSERT/UPDATE/DELETE no schema (DELETE é necessário, por exemplo, para limpeza de assinaturas push), sem privilégios globais, FILE, administração de usuários ou DROP. Não forneça acesso SQL da aplicação aos tenants. O isolamento de aplicação usa escopo e FKs, pois MySQL não possui o RLS do plano original. Veja os três procedimentos de deploy no [README](../README.md#deploy-em-produção).
 

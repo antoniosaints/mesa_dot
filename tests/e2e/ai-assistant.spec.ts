@@ -220,6 +220,14 @@ test('atalhos de resumo usam contexto e período e o chat cabe no celular em amb
       expect(await chat.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(
         true,
       );
+      const header = chat.locator('.ai-chat-header');
+      const title = (await header.locator('div').boundingBox())!;
+      const buttons = header.getByRole('button');
+      for (const button of await buttons.all()) await expect(button).toBeInViewport({ ratio: 1 });
+      expect(title.x + title.width).toBeLessThanOrEqual((await buttons.first().boundingBox())!.x);
+      expect(await header.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(
+        true,
+      );
       await page.screenshot({ path: '.local/screenshots/ai-chat-' + width + '-' + theme + '.png' });
     }
 });

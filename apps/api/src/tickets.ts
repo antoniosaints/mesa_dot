@@ -1,3 +1,4 @@
+import { assertNoPendingRefund } from './gateway-operations.js';
 import { closeCounterIfComplete } from './counter-lifecycle.js';
 import { sql, type Scope, type Row } from '../../../packages/database/src/index.js';
 import { ensure, permit, hash, deriveToken } from '../../../packages/shared/src/index.js';
@@ -60,6 +61,7 @@ export async function ticketDocument(s: Scope, id: string) {
 export async function redeemTicket(s: Scope, id: string, token: string) {
   permit(s.actor, 'ticket.redeem');
   const { ticket, item, order } = await accessTicket(s, id);
+  await assertNoPendingRefund(s, order.id);
   if (['PREPAID', 'IMMEDIATE'].includes(order.payment_policy_snapshot))
     ensure(
       (await approvedForOrder(s, order.id)) >= money(order.total),
@@ -215,7 +217,8 @@ export async function advanceProduction(s: Scope, id: string, status: 'PREPARING
     'INVALID_STATE',
     'Transição de produção inválida.',
   );
-  const { ticket, item } = await accessTicket(s, job.ticket_id);
+  const { ticket, item, order } = await accessTicket(s, job.ticket_id);
+  await assertNoPendingRefund(s, order.id);
   if (status === 'READY' && item.stock_policy_snapshot === 'ON_PRODUCTION')
     await consumeTicketStock(s, ticket.id);
   await s.update('production_jobs', id, { status });

@@ -1,0 +1,444 @@
+/* Shared component contracts. Every selector is limited to the optional ERP
+   layout or a portal carrying its React interface scope. */
+:is(.mesa-erp, .mesa-erp-surface) :where(button, input, select, textarea) {
+  font-family: Sora, Tahoma, sans-serif;
+  border-radius: var(--radius-control);
+}
+:is(.mesa-erp, .mesa-erp-surface) :where(button) {
+  min-height: var(--control-height);
+  font-size: var(--text-label);
+  font-weight: 600;
+}
+:is(.mesa-erp, .mesa-erp-surface)
+  :where(input:not([type='checkbox']):not([type='radio']):not([type='color']), select, textarea) {
+  min-height: var(--control-height);
+  font-size: var(--text-body);
+  border-color: var(--color-control-border);
+  color: var(--color-text);
+  background: var(--color-surface-subtle);
+}
+:is(.mesa-erp, .mesa-erp-surface) :where(input, select, textarea):focus {
+  border-color: var(--color-brand-ink);
+  outline: 2px solid var(--color-brand-ink);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+:is(.mesa-erp, .mesa-erp-surface) :where(button, a):focus-visible {
+  outline: 2px solid var(--color-brand-ink);
+  outline-offset: 3px;
+}
+:is(.mesa-erp, .mesa-erp-surface) :where(label) {
+  font-size: var(--text-label);
+  line-height: 1.5;
+}
+:is(.mesa-erp, .mesa-erp-surface) :where(.field-hint, .muted.small, .modal-description) {
+  font-size: var(--text-caption);
+  line-height: 1.6;
+}
+:is(.mesa-erp, .mesa-erp-surface) .field-error {
+  color: var(--color-danger);
+  font-size: 12px;
+  line-height: 1.5;
+}
+:is(.mesa-erp, .mesa-erp-surface) :where(input, select, textarea)[aria-invalid='true'] {
+  border-color: var(--color-danger);
+}
+:is(.mesa-erp, .mesa-erp-surface) :where(.panel, .product-editor-card, .card, .resource-panel) {
+  border-radius: var(--radius-card);
+  border-color: var(--color-border);
+  background: var(--color-surface);
+  box-shadow: none;
+}
+:is(.mesa-erp, .mesa-erp-surface) :where(h2, h3) {
+  line-height: 1.4;
+  font-weight: 700;
+}
+:is(.mesa-erp, .mesa-erp-surface) .section-head {
+  gap: 12px;
+  min-width: 0;
+}
+:is(.mesa-erp, .mesa-erp-surface) :where(.section-head, .button-row) > * {
+  min-width: 0;
+}
+:is(.mesa-erp, .mesa-erp-surface) :where(.button-row, .table-actions) {
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.table-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+.mesa-erp :is(.data-table, .print-queue-table-wrap, .catalog-products-table-wrap) {
+  min-width: 0;
+}
+:is(.mesa-erp, .mesa-erp-surface) table {
+  color: var(--color-text);
+}
+:is(.mesa-erp, .mesa-erp-surface) table :where(th, td) {
+  padding: 8px 12px;
+  vertical-align: middle;
+}
+:is(.mesa-erp, .mesa-erp-surface) table th {
+  background: var(--color-surface-subtle);
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+  font-weight: 600;
+  letter-spacing: normal;
+  text-transform: none;
+  border-color: var(--color-border);
+}
+:is(.mesa-erp, .mesa-erp-surface) table td {
+  font-size: 13px;
+  line-height: 1.5;
+  border-color: var(--color-border);
+}
+:is(.mesa-erp, .mesa-erp-surface) table td :where(small) {
+  font-size: 12px;
+  line-height: 1.5;
+}
+:is(.mesa-erp, .mesa-erp-surface) table td.numeric-column {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+:is(.mesa-erp, .mesa-erp-surface) table th.numeric-column {
+  text-align: right;
+}
+:is(.mesa-erp, .mesa-erp-surface) table :is(th, td):last-child:not([colspan]) {
+  text-align: right;
+}
+:is(.mesa-erp, .mesa-erp-surface)
+  table
+  td:last-child:not([colspan])
+  > :is(.button-row, .table-actions, .resource-row-actions) {
+  justify-content: flex-end;
+}
+:is(.mesa-erp, .mesa-erp-surface) table tbody tr:not(.is-selected):hover {
+  background: var(--color-surface-subtle);
+}
+:is(.mesa-erp, .mesa-erp-surface) table :where(button) {
+  min-height: var(--control-height-compact);
+  font-size: 12px;
+}
+:is(.mesa-erp, .mesa-erp-surface) .data-table-sort {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  min-height: 28px;
+  justify-content: flex-start;
+  text-align: inherit;
+  font-size: inherit;
+  width: 100%;
+}
+:is(.mesa-erp, .mesa-erp-surface) th.numeric-column .data-table-sort {
+  justify-content: flex-end;
+}
+:is(.mesa-erp, .mesa-erp-surface) .table-toolbar {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+:is(.mesa-erp, .mesa-erp-surface) .resource-sort-control {
+  display: grid;
+  gap: 6px;
+  flex: 0 1 250px;
+}
+:is(.mesa-erp, .mesa-erp-surface) .resource-sort-control > span {
+  font-size: 12px;
+  color: var(--muted);
+}
+:is(.mesa-erp, .mesa-erp-surface) .table-pagination {
+  padding-block: 12px;
+  gap: 12px;
+  font-size: 12px;
+  border-color: var(--color-border);
+}
+:is(.mesa-erp, .mesa-erp-surface) .table-pagination-controls,
+:is(.mesa-erp, .mesa-erp-surface) .table-pagination-numbers {
+  gap: 4px;
+  flex-wrap: wrap;
+}
+:is(.mesa-erp, .mesa-erp-surface) .table-pagination button {
+  min-height: 36px;
+  min-width: 36px;
+  width: auto;
+  gap: 0;
+}
+:is(.mesa-erp, .mesa-erp-surface) .table-pagination :is(select, .search-select input) {
+  font-size: 12px;
+}
+:is(.mesa-erp, .mesa-erp-surface) .table-pagination > :is(select, .search-select) {
+  width: 160px;
+  max-width: 100%;
+  flex: 0 0 auto;
+}
+.mesa-erp .search-input:focus-within {
+  border-color: var(--color-brand-ink);
+  outline: 2px solid var(--color-brand-ink);
+  outline-offset: 2px;
+}
+.mesa-erp .search-input > input,
+.mesa-erp .search-input > input:focus {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  outline: none;
+  box-shadow: none;
+}
+.page-loading.mesa-erp-surface {
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+:is(.mesa-erp, .mesa-erp-surface) .badge {
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.4;
+  padding: 4px 7px;
+}
+:is(.mesa-erp, .mesa-erp-surface) .record-tag {
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+:is(.mesa-erp, .mesa-erp-surface)
+  :where(.alert, .flow-note, .product-management-note, .product-help) {
+  border-radius: var(--radius-control);
+  font-size: 12px;
+  line-height: 1.6;
+}
+:is(.mesa-erp, .mesa-erp-surface) .ds-empty {
+  padding: 28px 16px;
+  gap: 12px;
+}
+:is(.mesa-erp, .mesa-erp-surface) .ds-empty p {
+  font-size: 13px;
+  color: var(--muted);
+}
+:is(.mesa-erp, .mesa-erp-surface) .error-state {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  color: var(--color-danger);
+  border: 1px solid var(--color-danger);
+  border-radius: 8px;
+  background: var(--color-danger-bg);
+}
+:is(.mesa-erp, .mesa-erp-surface) .error-state > div {
+  min-width: 0;
+  flex: 1;
+}
+:is(.mesa-erp, .mesa-erp-surface) .error-state p {
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+:is(.mesa-erp, .mesa-erp-surface) .loading-skeleton {
+  display: grid;
+  gap: 12px;
+  width: 100%;
+  padding: 16px;
+}
+:is(.mesa-erp, .mesa-erp-surface) .loading-skeleton > span:not(.sr-only) {
+  display: block;
+  height: 20px;
+  border-radius: 6px;
+  background: var(--color-border);
+}
+:is(.mesa-erp, .mesa-erp-surface) .loading-skeleton > span:last-child {
+  width: 70%;
+}
+:is(.mesa-erp, .mesa-erp-surface) .form-field {
+  min-width: 0;
+}
+:is(.mesa-erp, .mesa-erp-surface) .form-error-summary {
+  grid-column: 1 / -1;
+  padding: 16px;
+  border: 1px solid var(--color-danger);
+  border-radius: 8px;
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+  font-size: 13px;
+}
+:is(.mesa-erp, .mesa-erp-surface) .form-error-summary > strong {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+:is(.mesa-erp, .mesa-erp-surface) .form-error-summary ul {
+  margin-bottom: 0;
+  padding-left: 20px;
+}
+:is(.mesa-erp, .mesa-erp-surface) .form-error-summary a {
+  color: inherit;
+  text-decoration: underline;
+}
+.mesa-erp-surface.overlay {
+  background: #050c1bb3;
+  backdrop-filter: blur(2px);
+}
+.mesa-erp-surface .modal {
+  border-radius: var(--radius-modal);
+  border-color: var(--color-border);
+  box-shadow: 0 24px 72px #0005;
+}
+.mesa-erp-surface .modal[data-size='confirm'] {
+  width: min(520px, 100%);
+}
+.mesa-erp-surface .modal[data-size='form'] {
+  width: min(720px, 100%);
+}
+.mesa-erp-surface .modal[data-size='detail'] {
+  width: min(1040px, 100%);
+}
+.mesa-erp-surface .modal[data-size='wide'] {
+  width: min(1480px, 100%);
+}
+.mesa-erp-surface .modal > .modal-header {
+  padding: 12px 20px;
+  background: var(--color-surface);
+  gap: 12px;
+}
+.mesa-erp-surface .modal > .modal-header > .modal-title {
+  font-size: 18px;
+  line-height: 1.4;
+  font-weight: 700;
+}
+.mesa-erp-surface .modal .modal-footer {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+  gap: 8px;
+}
+.mesa-erp-surface .modal > .modal-header > .modal-header-close {
+  width: 40px;
+  min-height: 40px;
+  border-radius: 8px;
+}
+.mesa-erp-surface.select-popup,
+.mesa-erp-surface.branch-menu,
+.mesa-erp-surface.receipt-action-menu {
+  border-color: var(--color-border);
+  border-radius: var(--radius-card);
+  box-shadow: 0 16px 48px #0003;
+  background: var(--color-surface);
+}
+.mesa-erp-surface .select-option {
+  min-height: 40px;
+  padding: 10px 12px;
+  font-size: 13px;
+}
+.mesa-erp-surface .select-search-hint {
+  font-size: 12px;
+}
+.mesa-erp-surface .select-option.highlighted {
+  background: var(--soft-blue);
+  color: var(--color-brand-ink);
+}
+.mesa-erp-surface.receipt-action-menu button {
+  min-height: 52px;
+}
+.mesa-erp-surface.branch-menu .branch-menu-note {
+  font-size: 12px;
+}
+.mesa-erp-surface.ai-chat-panel {
+  border-radius: var(--radius-modal);
+  background: var(--panel);
+  border-color: var(--line);
+}
+body:has(.mesa-erp) .toast {
+  border-radius: 12px;
+  background: var(--panel);
+  border-color: var(--line);
+}
+body:has(.mesa-erp) .toast p {
+  font-size: 13px;
+}
+body:has(.mesa-erp) .toast .icon-button {
+  min-width: 36px;
+  min-height: 36px;
+}
+@media (max-width: 700px) {
+  :is(.mesa-erp, .mesa-erp-surface) :where(button) {
+    min-height: var(--control-height-touch);
+  }
+  :is(.mesa-erp, .mesa-erp-surface)
+    :where(input:not([type='checkbox']):not([type='radio']):not([type='color']), select, textarea) {
+    font-size: 16px;
+    min-height: 44px;
+  }
+  :is(.mesa-erp, .mesa-erp-surface) table td {
+    font-size: 13px;
+  }
+  :is(.mesa-erp, .mesa-erp-surface) table :where(button) {
+    min-height: 44px;
+  }
+  :is(.mesa-erp, .mesa-erp-surface) .mobile-card-table td {
+    padding: 0;
+  }
+  :is(.mesa-erp, .mesa-erp-surface) .mobile-card-table td.numeric-column {
+    align-items: flex-start;
+    text-align: left;
+  }
+  :is(.mesa-erp, .mesa-erp-surface) .mobile-card-table td:last-child:not([colspan]) {
+    padding-top: 12px;
+  }
+  :is(.mesa-erp, .mesa-erp-surface) .table-toolbar > label {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+  :is(.mesa-erp, .mesa-erp-surface) .table-pagination button {
+    min-height: 44px;
+    min-width: 36px;
+    padding: 6px;
+  }
+  :is(.mesa-erp, .mesa-erp-surface) .table-pagination :is(select, .search-select input) {
+    font-size: 14px;
+  }
+  :is(.mesa-erp, .mesa-erp-surface) .error-state {
+    flex-wrap: wrap;
+  }
+  .mesa-erp-surface.overlay {
+    padding: 8px;
+  }
+  .mesa-erp-surface .modal {
+    max-height: calc(100dvh - 16px);
+    border-radius: 12px;
+  }
+  .mesa-erp-surface .modal > .section-head.modal-header {
+    grid-template-columns: minmax(0, 1fr) 44px;
+    padding: 16px;
+    gap: 12px 8px;
+  }
+  .mesa-erp-surface .modal > .modal-header > .modal-title {
+    font-size: 16px;
+  }
+  .mesa-erp-surface .modal > .modal-header > .modal-header-close {
+    width: 44px;
+    min-height: 44px;
+  }
+  .mesa-erp-surface .modal > .modal-header .modal-header-actions > :is(button, a) {
+    min-height: 44px;
+  }
+  .mesa-erp-surface .select-option {
+    min-height: 44px;
+  }
+  body:has(.mesa-erp) .toast .icon-button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  :is(.mesa-erp, .mesa-erp-surface) .loading-skeleton > span:not(.sr-only) {
+    animation: erp-skeleton 1.6s ease-in-out infinite alternate;
+  }
+}
+@keyframes erp-skeleton {
+  from {
+    opacity: 0.45;
+  }
+  to {
+    opacity: 1;
+  }
+}

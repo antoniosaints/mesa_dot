@@ -45,3 +45,7 @@ O modo Ajuda envia a pergunta, o histórico recente e um guia do Mesa. O modo Re
 - Consultas Gemini usam reserva temporária no Redis para impedir processamento duplicado da mesma solicitação. A geração acontece fora da transação da filial, permitindo que pedidos, recebimentos e entregas continuem enquanto a IA responde. Permissão e ativação são revalidadas antes de publicar a resposta.
 - Conectividade de saída da API: `auth.mercadopago.com` (navegador), `api.mercadopago.com` e `generativelanguage.googleapis.com`. Webhooks exigem acesso público HTTPS à API.
 - Testes automatizados usam transportes simulados apenas em arquivos de teste. A homologação final com aplicação, conta recebedora, chave Google e transação real precisa ser feita com as credenciais do responsável.
+
+## Recuperação automática do Mercado Pago
+
+A partir da migration `0029_gateway_operations.sql`, checkout, estorno e OAuth não mantêm a transação da filial durante chamadas externas. O worker concilia pagamentos e estornos pela fila `mercado-payments`. Webhooks e sincronização manual continuam disponíveis. Veja [proxies, fases, retry e revisão de operações](proxy-e-pagamentos.md).

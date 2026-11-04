@@ -10,6 +10,10 @@ export function fakeComplementProviders(approveOnSearch = false) {
   let failGeneration = false;
   let generationBarrier: Promise<void> | undefined;
   let invalidImage = false;
+  let mercadoBarrier: { path: string; promise: Promise<void> } | undefined;
+  let failPaymentSearch = false;
+  let failPreferenceAfterApply = false,
+    failRefundAfterApply = false;
   const original = globalThis.fetch;
   const json = (value: unknown, status = 200) =>
     new Response(JSON.stringify(value), {
@@ -95,6 +99,7 @@ export function fakeComplementProviders(approveOnSearch = false) {
         usageMetadata: { totalTokenCount: 42 },
       });
     }
+    if (mercadoBarrier && url.pathname === mercadoBarrier.path) await mercadoBarrier.promise;
     const account = headers.get('authorization')?.split('-').at(-1) || '123456';
     if (url.pathname === '/oauth/token') {
       const id =
@@ -108,9 +113,30 @@ export function fakeComplementProviders(approveOnSearch = false) {
     }
     if (url.pathname === '/users/me')
       return json({ id: Number(account), nickname: 'Conta de homologação', site_id: 'MLB' });
+    if (url.pathname === '/checkout/preferences/search') {
+      return json({
+        elements: [...preferences.entries()]
+          .filter(
+            ([, pref]) => pref.external_reference === url.searchParams.get('external_reference'),
+          )
+          .map(([id, pref]) => ({ id, ...pref })),
+        total: preferences.size,
+      });
+    }
+    if (url.pathname.startsWith('/checkout/preferences/'))
+      return json(
+        preferences.get(url.pathname.split('/').at(-1)!) ?? {},
+        preferences.has(url.pathname.split('/').at(-1)!) ? 200 : 404,
+      );
     if (url.pathname === '/checkout/preferences') {
       const id = String(++sequence);
-      preferences.set(id, body);
+      preferences.set(id, {
+        ...body,
+        id,
+        collector_id: Number(account),
+        init_point: 'https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=' + id,
+        sandbox_init_point: 'https://sandbox.mercadopago.com.br/checkout/v1/redirect?pref_id=' + id,
+      });
       payments.set(id, {
         id: Number(id),
         external_reference: body.external_reference,
@@ -122,6 +148,10 @@ export function fakeComplementProviders(approveOnSearch = false) {
         date_last_updated: '2026-10-30T10:00:00Z',
         refunds: [],
       });
+      if (failPreferenceAfterApply) {
+        failPreferenceAfterApply = false;
+        throw new Error('synthetic connection lost after preference');
+      }
       return json({
         id,
         init_point: 'https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=' + id,
@@ -129,11 +159,20 @@ export function fakeComplementProviders(approveOnSearch = false) {
       });
     }
     if (url.pathname === '/v1/payments/search') {
+      if (failPaymentSearch) {
+        failPaymentSearch = false;
+        return json({ error: 'synthetic unavailable' }, 503);
+      }
       const found = [...payments.values()].filter(
         (payment) => payment.external_reference === url.searchParams.get('external_reference'),
       );
       if (approveOnSearch) for (const payment of found) payment.status = 'approved';
-      return json({ results: found });
+      const offset = Number(url.searchParams.get('offset') ?? 0),
+        limit = Number(url.searchParams.get('limit') ?? 50);
+      return json({
+        results: found.slice(offset, offset + limit),
+        paging: { total: found.length, offset, limit },
+      });
     }
     const match = url.pathname.match(/^\/v1\/payments\/(\d+)(\/refunds)?$/);
     if (match) {
@@ -153,6 +192,10 @@ export function fakeComplementProviders(approveOnSearch = false) {
               : 'approved';
           payment.date_last_updated = new Date().toISOString();
         }
+        if (failRefundAfterApply) {
+          failRefundAfterApply = false;
+          throw new Error('synthetic connection lost after refund');
+        }
         return json(refunds.get(key));
       }
       return json(payment.refunds);
@@ -166,6 +209,28 @@ export function fakeComplementProviders(approveOnSearch = false) {
     preferences,
     refunds,
     nextId: () => ++sequence,
+    failNextPaymentSearch: () => {
+      failPaymentSearch = true;
+    },
+    failNextPreferenceAfterApply: () => {
+      failPreferenceAfterApply = true;
+    },
+    failNextRefundAfterApply: () => {
+      failRefundAfterApply = true;
+    },
+    pauseMercado: (path: string) => {
+      let release!: () => void;
+      mercadoBarrier = {
+        path,
+        promise: new Promise<void>((resolve) => {
+          release = resolve;
+        }),
+      };
+      return () => {
+        mercadoBarrier = undefined;
+        release();
+      };
+    },
     setInvalidImage: (value: boolean) => {
       invalidImage = value;
     },

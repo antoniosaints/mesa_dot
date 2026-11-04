@@ -1,11 +1,12 @@
 import { complement } from './complement-store.js';
-import { createMercadoCheckout, mercadoConfigured, refundMercado } from './mercadopago.js';
+import { mercadoConfigured, mercadoToken, mercadoPreference } from './mercadopago.js';
+import { reserveGatewayOperation } from './gateway-operations.js';
 import { sql, type Scope, type Row } from '../../../packages/database/src/index.js';
 import { ensure, permit, money, formatDecimal } from '../../../packages/shared/src/index.js';
 import { env } from '../../../packages/shared/src/config.js';
 import { accessOrder, accessTab, confirmOrder } from './orders.js';
 import { holdOrder } from './inventory.js';
-import { lockCashUnit } from './cash-sessions.js';
+import { lockCashUnit, selectOrderCash } from './cash-sessions.js';
 export async function tabBalance(s: Scope, tabId: string) {
   await s.get('tabs', tabId);
   let charges = 0n;
@@ -53,7 +54,7 @@ export async function approvedForOrder(s: Scope, orderId: string) {
     }
   return amount;
 }
-export async function createIntent(s: Scope, orderId: string) {
+export async function createIntent(s: Scope, orderId: string): Promise<Row> {
   const connection = await complement(s, 'mercadopago');
   const real = Boolean(connection?.enabled && connection.credentials);
   ensure(
@@ -86,16 +87,28 @@ export async function createIntent(s: Scope, orderId: string) {
     return { ...previous[0], sandbox: previous[0].provider === 'sandbox' };
   }
   await holdOrder(s, order);
+  const seller = real ? await mercadoToken(s, undefined, true) : null;
   const intent = await s.insert('payment_intents', {
     order_id: order.id,
     provider: real ? 'mercadopago' : 'sandbox',
+    external_account_id: seller?.account_id ?? null,
     provider_reference: crypto.randomUUID(),
     amount: order.total,
     status: 'PENDING',
     expires_at: new Date(Date.now() + 10 * 60_000),
   });
   await s.audit('payment.intent_created', intent.id);
-  return real ? createMercadoCheckout(s, intent) : { ...intent, sandbox: true };
+  if (real) {
+    await reserveGatewayOperation(s, 'CHECKOUT', intent.id, 'checkout:' + intent.id, {
+      preference: await mercadoPreference(s, intent),
+    });
+    await s.insert('payment_reconciliation', {
+      intent_id: intent.id,
+      watch_until: new Date(Date.now() + 180 * 86400000),
+      next_attempt_at: new Date(Date.now() + 60000),
+    });
+  }
+  return { ...intent, sandbox: !real };
 }
 export interface GatewayEvent {
   provider?: 'sandbox' | 'mercadopago';
@@ -216,7 +229,10 @@ export async function receiveManual(
   },
 ) {
   permit(s.actor, 'payment.receive');
-  if (input.cash_session_id) await lockCashUnit(s);
+  // Serialize receipts with opening/closing a shift, even when an API client
+  // omits the shift for Pix/card. Explicit operator selection takes precedence.
+  const unit = await lockCashUnit(s);
+  const cash = await selectOrderCash(s, unit, input.cash_session_id);
   ensure(
     new Set(input.allocations.map((a) => a.tab_id)).size === input.allocations.length,
     'BAD_REQUEST',
@@ -238,13 +254,7 @@ export async function receiveManual(
   }
   ensure(total > 0n, 'BAD_REQUEST', 'Pagamento vazio.', 400);
   if (input.method === 'CASH')
-    ensure(input.cash_session_id, 'BAD_REQUEST', 'Pagamento em dinheiro exige caixa aberto.', 400);
-  if (input.cash_session_id)
-    ensure(
-      (await s.get('cash_sessions', input.cash_session_id)).status === 'OPEN',
-      'INVALID_STATE',
-      'Caixa encerrado.',
-    );
+    ensure(cash, 'BAD_REQUEST', 'Pagamento em dinheiro exige caixa aberto.', 400);
   const payment = await s.insert('payments', {
     provider: input.method,
     provider_reference: crypto.randomUUID(),
@@ -260,20 +270,23 @@ export async function receiveManual(
       tab_id: allocation.tab_id,
       amount: allocation.amount,
     });
-  if (input.cash_session_id)
+  if (cash)
     await s.insert('cash_movements', {
-      cash_session_id: input.cash_session_id,
+      cash_session_id: cash.id,
       payment_id: payment.id,
       type: input.method,
       amount: payment.amount,
       reason: 'Recebimento',
       source_key: `payment:${payment.id}`,
     });
-  await s.audit('payment.received', payment.id, { method: input.method });
+  await s.audit('payment.received', payment.id, {
+    method: input.method,
+    cash_session_id: cash?.id ?? null,
+  });
   await s.event('payment.approved', payment.id);
   return payment;
 }
-export async function refundPayment(
+export async function validateRefund(
   s: Scope,
   paymentId: string,
   input: { amount: string; tab_id?: string; reason: string; cash_session_id?: string },
@@ -333,16 +346,56 @@ export async function refundPayment(
       'Caixa encerrado.',
     );
   }
-  const providerReference =
-    payment.provider === 'mercadopago'
-      ? await refundMercado(s, payment, input.amount, alreadyRefunded)
-      : crypto.randomUUID();
+  return { payment, alreadyRefunded, value };
+}
+export interface RefundInput {
+  amount: string;
+  tab_id?: string;
+  reason: string;
+  cash_session_id?: string;
+}
+export async function recordRefund(
+  s: Scope,
+  paymentId: string,
+  input: RefundInput,
+  providerReference: string,
+  createdBy = s.actor.id,
+) {
+  const payment = await s.get('payments', paymentId, true);
+  const known = await s.list('refunds', sql`payment_id=${paymentId} AND status='APPROVED'`);
+  const existing = known.find((row) => row.provider_reference === providerReference);
+  if (existing) {
+    ensure(
+      money(existing.amount) === money(input.amount) &&
+        (!existing.tab_id || existing.tab_id === input.tab_id),
+      'CONFLICT',
+      'Estorno confirmado divergente. Conciliação necessária.',
+      409,
+    );
+    if (existing.reason === 'Estorno registrado no Mercado Pago')
+      await s.update('refunds', existing.id, {
+        tab_id: input.tab_id ?? existing.tab_id,
+        reason: input.reason,
+        created_by: createdBy,
+      });
+    else if (!existing.tab_id && input.tab_id)
+      await s.update('refunds', existing.id, { tab_id: input.tab_id });
+    return s.get('refunds', existing.id);
+  }
+  const alreadyRefunded = known.reduce((sum, row) => sum + money(row.amount), 0n),
+    value = money(input.amount);
+  ensure(
+    value > 0n && value + alreadyRefunded <= money(payment.amount),
+    'CONFLICT',
+    'Estorno excede o recebimento confirmado.',
+    409,
+  );
   const refund = await s.insert('refunds', {
     payment_id: paymentId,
     tab_id: input.tab_id ?? null,
     amount: input.amount,
     reason: input.reason,
-    created_by: s.actor.id,
+    created_by: createdBy,
     provider_reference: providerReference,
     status: 'APPROVED',
   });
@@ -365,6 +418,17 @@ export async function refundPayment(
   });
   await s.event('payment.refunded', paymentId);
   return refund;
+}
+
+export async function refundPayment(s: Scope, paymentId: string, input: RefundInput) {
+  const { payment } = await validateRefund(s, paymentId, input);
+  ensure(
+    payment.provider !== 'mercadopago',
+    'INTERNAL_ERROR',
+    'Estorno remoto exige operação persistente.',
+    500,
+  );
+  return recordRefund(s, paymentId, input, crypto.randomUUID());
 }
 
 /** Only called with a payment fetched from Mercado Pago with this venue's seller token. */

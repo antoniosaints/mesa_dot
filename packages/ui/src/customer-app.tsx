@@ -1,4 +1,10 @@
 import { BusinessInformation } from './business-information.js';
+import {
+  customerTicketGroups,
+  pendingCustomerTickets,
+  requestCustomerTicket,
+  type CustomerTicketGroup,
+} from './customer-contexts.js';
 import { ProductPhotoImage } from './product-photo.js';
 import { OnlinePaymentDialog } from './online-payment.js';
 import { CustomerConsumption } from './customer-consumption.js';
@@ -11,7 +17,7 @@ import {
   dayHoursLabel,
 } from '../../shared/src/business-hours.js';
 import { PhoneInput } from './phone-input.js';
-import { orderLocationLabel } from '../../shared/src/order-location.js';
+import { CustomerTickets } from './customer-tickets.js';
 import { TableQrReader } from './table-qr-reader.js';
 import {
   StockHint,
@@ -46,7 +52,8 @@ export function CustomerApp() {
   const params = new URLSearchParams(routeLocation.search);
   const slug = pwaContext()?.slug ?? params.get('bar') ?? 'boteco-da-esquina';
   const tableCode = params.get('table') ?? '';
-  const scopeKey = `bar-customer:${pwaContext()?.establishment_id ?? slug}:${tableCode}`;
+  const customerScope = `bar-customer:${pwaContext()?.establishment_id ?? slug}`;
+  const scopeKey = `${customerScope}:${tableCode}`;
   useStorageKey(scopeKey);
   const activeScope = useRef(scopeKey),
     previousScope = useRef(scopeKey);
@@ -58,6 +65,10 @@ export function CustomerApp() {
   );
   const [readingTable, setReadingTable] = useState(false);
   const [scannedTable, setScannedTable] = useState<string | null>(null);
+  const [contextChange, setContextChange] = useState<{
+    code: string;
+    destination: 'menu' | 'tickets';
+  } | null>(null);
   const [identity, setIdentity] = useState({ name: '', phone: '', join_code: '' });
   const [menu, setMenu] = useState<Data | null>(null);
   const [category, setCategory] = useState('all');
@@ -71,6 +82,16 @@ export function CustomerApp() {
   const [cartOpen, setCartOpen] = useState(false);
   const [now, setNow] = useState(() => new Date());
   const [tickets, setTickets] = useState<Data[]>([]);
+  const [ticketSnapshot, setTicketSnapshot] = useState<{
+    scope: string;
+    groups: CustomerTicketGroup[];
+  }>({ scope: '', groups: [] });
+  const ticketSnapshotRef = useRef(ticketSnapshot);
+  ticketSnapshotRef.current = ticketSnapshot;
+  const [ticketsLoading, setTicketsLoading] = useState(false);
+  const ticketRead = useRef(0);
+  const ticketGroups = ticketSnapshot.scope === customerScope ? ticketSnapshot.groups : [];
+  const hasCustomer = Boolean(visitor || ticketGroups.length);
   const [tabs, setTabs] = useState<Data[]>([]);
   const [orders, setOrders] = useState<Data[]>([]);
   const [intent, setIntent] = useState<Data | null>(null);
@@ -110,19 +131,34 @@ export function CustomerApp() {
     setIntent(null);
     setPaymentCompleted(false);
     setCartOpen(false);
+    setActiveTicket(null);
+    setContextChange(null);
   }, [scopeKey]);
-  function selectContext(code = '') {
+  function applyContext(code = '', destination: 'menu' | 'tickets' = 'menu') {
+    setContextChange(null);
     setReadingTable(false);
     setProduct(null);
     if (code === tableCode) {
       setIdentifyMode(code ? 'TABLE' : 'COUNTER');
       if (!visitor) setIdentifying(true);
+      else setPage(destination);
       return;
     }
     const query = new URLSearchParams(routeLocation.search);
     if (code) query.set('table', code);
     else query.delete('table');
-    void navigate({ pathname: '/cardapio', search: query.toString() });
+    void navigate({
+      pathname: destination === 'tickets' ? '/minhas-fichas' : '/cardapio',
+      search: query.toString(),
+    });
+  }
+  function selectContext(code = '', destination: 'menu' | 'tickets' = 'menu') {
+    setReadingTable(false);
+    if (visitor && code !== tableCode) {
+      setContextChange({ code, destination });
+      return;
+    }
+    applyContext(code, destination);
   }
   useEffect(() => {
     if (scannedTable === null || readingTable) return;
@@ -195,48 +231,88 @@ export function CustomerApp() {
   }
   async function load() {
     const requestScope = scopeKey;
-    await refresh(async () => {
-      const catalog = await api(`/public/${slug}/menu`);
-      if (activeScope.current !== requestScope) return;
-      setMenu(catalog);
-      if (
-        pwaContext() &&
-        (pwaContext()!.slug !== catalog.establishment.slug ||
-          pwaContext()!.name !== catalog.establishment.name)
-      )
-        window.dispatchEvent(new Event('mesa:pwa-refresh'));
-      if (catalog.establishment.primary_color)
-        appearanceStore.setPrimary(catalog.establishment.primary_color);
-      if (session()?.token) {
-        try {
-          const [t, b, o] = await Promise.all([
-            api('/my-tickets'),
-            api('/my-tabs'),
-            api('/my-consumption'),
-          ]);
-          if (activeScope.current !== requestScope) return;
-          setTickets(t);
-          setTabs(b);
-          setOrders(o);
-        } catch (error) {
-          if (
-            activeScope.current === requestScope &&
-            error &&
-            typeof error === 'object' &&
-            'code' in error &&
-            error.code === 'UNAUTHORIZED'
-          ) {
-            saveSession(null);
+    const read = ++ticketRead.current;
+    setTicketsLoading(true);
+    try {
+      await refresh(async () => {
+        const [catalogResult, groupsResult] = await Promise.allSettled([
+          api(`/public/${slug}/menu`),
+          customerTicketGroups(
+            customerScope,
+            ticketSnapshotRef.current.scope === customerScope
+              ? ticketSnapshotRef.current.groups
+              : [],
+          ),
+        ]);
+        if (activeScope.current !== requestScope || read !== ticketRead.current) return;
+        if (groupsResult.status === 'fulfilled') {
+          setTicketSnapshot({ scope: customerScope, groups: groupsResult.value });
+          setTickets(groupsResult.value.find((group) => group.code === tableCode)?.tickets ?? []);
+          if (!session()) {
             setVisitor(null);
-            setTickets([]);
             setTabs([]);
             setOrders([]);
-          } else throw error;
+          }
         }
-      }
-    });
+        if (catalogResult.status === 'rejected') throw catalogResult.reason;
+        const catalog = catalogResult.value;
+        setMenu(catalog);
+        if (
+          pwaContext() &&
+          (pwaContext()!.slug !== catalog.establishment.slug ||
+            pwaContext()!.name !== catalog.establishment.name)
+        )
+          window.dispatchEvent(new Event('mesa:pwa-refresh'));
+        if (catalog.establishment.primary_color)
+          appearanceStore.setPrimary(catalog.establishment.primary_color);
+        const requestToken = session()?.token;
+        if (requestToken) {
+          try {
+            const [b, o] = await Promise.all([api('/my-tabs'), api('/my-consumption')]);
+            if (
+              activeScope.current !== requestScope ||
+              read !== ticketRead.current ||
+              session()?.token !== requestToken
+            )
+              return;
+            setTabs(b);
+            setOrders(o);
+          } catch (error) {
+            if (
+              activeScope.current === requestScope &&
+              read === ticketRead.current &&
+              session()?.token === requestToken &&
+              error &&
+              typeof error === 'object' &&
+              'code' in error &&
+              error.code === 'UNAUTHORIZED'
+            ) {
+              saveSession(null);
+              setVisitor(null);
+              setTickets([]);
+              setTabs([]);
+              setOrders([]);
+            } else throw error;
+          }
+        }
+      });
+    } finally {
+      if (activeScope.current === requestScope && read === ticketRead.current)
+        setTicketsLoading(false);
+    }
   }
   useRefresh(load, [scopeKey, visitor?.visitor_id]);
+  useEffect(() => {
+    const resume = () => {
+      if (document.visibilityState === 'visible') void load();
+    };
+    window.addEventListener('focus', resume);
+    document.addEventListener('visibilitychange', resume);
+    return () => {
+      window.removeEventListener('focus', resume);
+      document.removeEventListener('visibilitychange', resume);
+    };
+  }, [scopeKey]);
   useEffect(() => {
     if (!paymentCompleted) return;
     // Navigate after the payment modal unmounts and releases its in-flight navigation guard.
@@ -310,10 +386,19 @@ export function CustomerApp() {
       )
     : 0;
   const cartUnits = cart.reduce((sum, line) => sum + Number(line.quantity), 0);
-  const openTickets = tickets.filter(
-    (ticket) => !['REDEEMED', 'CANCELLED'].includes(ticket.status),
+  const openTickets = ticketGroups.flatMap((group) =>
+    group.error ? [] : pendingCustomerTickets(group.tickets),
   );
-  const viewedTicket = tickets.find((ticket) => ticket.id === activeTicket?.id) ?? activeTicket;
+  const ticketReadErrors = ticketGroups.some((group) => group.error);
+  const currentOpenTickets = pendingCustomerTickets(tickets);
+  const otherPendingGroups = ticketGroups.filter(
+    (group) =>
+      group.code !== tableCode && !group.error && pendingCustomerTickets(group.tickets).length > 0,
+  );
+  const viewedGroup = ticketGroups.find((group) =>
+    group.tickets.some((ticket) => ticket.id === activeTicket?.id),
+  );
+  const viewedTicket = viewedGroup?.tickets.find((ticket) => ticket.id === activeTicket?.id);
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' });
   }, [page, scopeKey]);
@@ -331,7 +416,7 @@ export function CustomerApp() {
     <div
       className={
         'customer-app' +
-        (visitor ? ' has-customer-nav' : '') +
+        (hasCustomer ? ' has-customer-nav' : '') +
         (cart.length ? ' has-customer-cart' : '')
       }
     >
@@ -343,7 +428,7 @@ export function CustomerApp() {
       <main className="customer-content">
         <Connectivity />
         {feedback}
-        {page === 'menu' || !visitor ? (
+        {page === 'menu' || (!hasCustomer && page !== 'tickets') ? (
           <section className="customer-welcome">
             <div className="customer-welcome-tools">
               <span className="eyebrow">BEM-VINDO À CASA</span>
@@ -454,7 +539,39 @@ export function CustomerApp() {
             )}
           </div>
         </section>
-        {visitor && (
+        {page !== 'tickets' && otherPendingGroups.length > 0 && (
+          <section
+            className="customer-saved-contexts"
+            aria-label="Fichas pendentes de outros atendimentos"
+          >
+            <div>
+              <Icon name="ticket" size={18} />
+              <span>
+                <strong>Você tem fichas a concluir</strong>
+                <small>
+                  {otherPendingGroups
+                    .map(
+                      (group) => `${group.label}: ${pendingCustomerTickets(group.tickets).length}`,
+                    )
+                    .join(' · ')}
+                </small>
+              </span>
+            </div>
+            <div className="button-row">
+              <button
+                type="button"
+                onClick={() => {
+                  setPage('tickets');
+                  void load();
+                }}
+              >
+                <Icon name="ticket" size={16} />
+                Ver todas as minhas fichas
+              </button>
+            </div>
+          </section>
+        )}
+        {hasCustomer && (
           <nav
             className="customer-nav customer-bottom-nav system-tabs"
             aria-label="Navegação do cliente"
@@ -470,14 +587,18 @@ export function CustomerApp() {
             <button
               className={page === 'tickets' ? 'active' : ''}
               aria-current={page === 'tickets' ? 'page' : undefined}
-              onClick={() => setPage('tickets')}
+              onClick={() => {
+                setPage('tickets');
+                void load();
+              }}
             >
               <Icon name="ticket" size={17} />
-              Minhas fichas <span>{openTickets.length}</span>
+              Minhas fichas <span>{ticketReadErrors ? '!' : openTickets.length}</span>
             </button>
             <button
               className={page === 'consumption' ? 'active' : ''}
               aria-current={page === 'consumption' ? 'page' : undefined}
+              disabled={!visitor}
               onClick={() => setPage('consumption')}
             >
               <Icon name="receipt" size={17} />
@@ -486,7 +607,7 @@ export function CustomerApp() {
           </nav>
         )}
         {visitor && page === 'notfound' && <RouteNotFound onHome={() => setPage('menu')} />}
-        {(page === 'menu' || !visitor) && (
+        {(page === 'menu' || (!hasCustomer && page !== 'tickets')) && (
           <>
             <div className="customer-menu-filters">
               <div className="customer-menu-search" role="search" aria-label="Buscar no cardápio">
@@ -599,72 +720,38 @@ export function CustomerApp() {
             </div>
           </>
         )}
-        {visitor && page === 'tickets' && (
+        {page === 'tickets' && (
           <div className="customer-ticket-list">
             <div className="customer-section-heading">
               <h2>Suas fichas de consumo</h2>
-              <span>{openTickets.length} a concluir</span>
+              <span>
+                {ticketReadErrors ? 'Atualização pendente' : `${openTickets.length} a concluir`}
+              </span>
+              <button type="button" disabled={ticketsLoading} onClick={() => void load()}>
+                <Icon name="refresh" size={16} />
+                {ticketsLoading ? 'Atualizando…' : 'Atualizar fichas'}
+              </button>
             </div>
-            {tickets.length ? (
-              tickets.map((t) => (
-                <section key={t.id} className="panel mini-ticket">
-                  <div className="section-head">
-                    <span className="customer-ticket-symbol">
-                      <Icon name="ticket" size={20} />
-                    </span>
-                    <span className="eyebrow">Ficha {t.public_number.slice(-6)}</span>
-                    <Badge status={t.status} />
-                  </div>
-                  <h2>{t.product}</h2>
-                  <p className="muted small">
-                    {orderLocationLabel(t)} · {t.tab_label} · Pedido #
-                    {t.order_id?.slice(0, 6).toUpperCase()}
-                  </p>
-                  <p className="customer-ticket-guidance">
-                    {['PENDING', 'PREPARING'].includes(t.status)
-                      ? 'Seu item está na cozinha. Avisaremos por aqui quando estiver pronto.'
-                      : t.status === 'REDEEMED'
-                        ? t.service_mode === 'COUNTER'
-                          ? 'Retirada concluída. Bom apetite!'
-                          : 'Item entregue. Bom apetite!'
-                        : ['REQUESTED', 'ASSIGNED'].includes(t.status)
-                          ? 'Entrega solicitada. A equipe está cuidando do seu pedido.'
-                          : t.status === 'CANCELLED'
-                            ? 'Esta ficha foi cancelada.'
-                            : t.service_mode === 'COUNTER'
-                              ? 'Pronto para retirar. Mostre sua ficha no balcão.'
-                              : 'Seu item está disponível. Solicite a entrega quando desejar.'}
-                  </p>
-                  <div className="button-row">
-                    <button
-                      className="customer-ticket-code"
-                      disabled={['REDEEMED', 'CANCELLED'].includes(t.status)}
-                      onClick={() => setActiveTicket(t)}
-                    >
-                      <Icon name="scan" size={17} />
-                      Exibir QR e código de barras
-                    </button>
-                    {t.service_mode !== 'COUNTER' && (
-                      <button
-                        className="primary"
-                        disabled={busy || t.status !== 'AVAILABLE' || !navigator.onLine}
-                        onClick={() =>
-                          void run(async () => {
-                            await api(`/tickets/${t.id}/request`, {});
-                            await load();
-                          }, 'Seu pedido de entrega foi enviado à equipe.')
-                        }
-                      >
-                        <Icon name="bell" size={17} />
-                        Pedir para trazer
-                      </button>
-                    )}
-                  </div>
-                </section>
-              ))
-            ) : (
-              <Empty>Suas fichas aparecem após a confirmação do pagamento.</Empty>
+            {ticketsLoading && !ticketGroups.length && (
+              <p className="muted" role="status">
+                Carregando suas fichas…
+              </p>
             )}
+            <CustomerTickets
+              groups={ticketGroups}
+              loading={ticketsLoading}
+              busy={busy}
+              onView={setActiveTicket}
+              onRequest={(code, ticket) =>
+                void run(async () => {
+                  try {
+                    await requestCustomerTicket(customerScope, code, ticket.id);
+                  } finally {
+                    await load();
+                  }
+                }, 'Seu pedido de entrega foi enviado à equipe.')
+              }
+            />
           </div>
         )}
         {visitor && page === 'consumption' && (
@@ -906,6 +993,38 @@ export function CustomerApp() {
               {identifyMode === 'COUNTER' ? 'Continuar para retirada →' : 'Entrar na mesa →'}
             </button>
           </form>
+        </Modal>
+      )}
+      {contextChange && (
+        <Modal title="Trocar atendimento?" onClose={() => setContextChange(null)}>
+          <div className="stack customer-context-confirmation">
+            <p>
+              {currentOpenTickets.length > 0
+                ? `Você tem ${currentOpenTickets.length} ${currentOpenTickets.length === 1 ? 'ficha pendente' : 'fichas pendentes'} ${isCounter ? 'na retirada' : `na Mesa ${visitor?.table_number}`}.`
+                : 'Seus pedidos e fichas pertencem ao atendimento atual.'}
+            </p>
+            <p className="muted">
+              Ao mudar para {contextChange.code ? 'outra mesa' : 'retirada'}, suas fichas continuam
+              vinculadas ao atendimento original. A aba “Minhas fichas” reúne as fichas de todas as
+              mesas e retiradas identificadas neste dispositivo.
+            </p>
+            <div className="button-row">
+              <button
+                className="primary"
+                onClick={() => {
+                  setContextChange(null);
+                  setPage('tickets');
+                }}
+              >
+                <Icon name="ticket" size={17} />
+                Manter e ver minhas fichas
+              </button>
+              <button onClick={() => applyContext(contextChange.code, contextChange.destination)}>
+                <Icon name="next" size={17} />
+                {contextChange.code ? 'Mudar de mesa' : 'Mudar para retirada'}
+              </button>
+            </div>
+          </div>
         </Modal>
       )}
       {readingTable && (
@@ -1160,7 +1279,11 @@ export function CustomerApp() {
         >
           <div className="ticket-document">
             <Badge status={viewedTicket.status} />
-            {['REDEEMED', 'CANCELLED'].includes(viewedTicket.status) ? (
+            {viewedGroup?.error ? (
+              <p role="alert">
+                Atualize suas fichas para verificar a situação antes de exibir o código.
+              </p>
+            ) : ['REDEEMED', 'CANCELLED'].includes(viewedTicket.status) ? (
               <p>Esta ficha já foi utilizada ou cancelada. Confira a situação em Minhas fichas.</p>
             ) : (
               <>
@@ -1168,7 +1291,7 @@ export function CustomerApp() {
                 <Code value={viewedTicket.token} barcode />
               </>
             )}
-            {!['REDEEMED', 'CANCELLED'].includes(viewedTicket.status) && (
+            {!viewedGroup?.error && !['REDEEMED', 'CANCELLED'].includes(viewedTicket.status) && (
               <p className="small muted">Mostre à equipe. A entrega será confirmada no sistema.</p>
             )}
           </div>

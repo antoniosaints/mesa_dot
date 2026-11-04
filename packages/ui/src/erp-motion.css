@@ -1,0 +1,113 @@
+/* Tactile actions inspired by Polaris: surface relief, hover and inset press.
+   Navigation, tabs, switches and clickable product cards keep their own states. */
+:is(.mesa-erp, .mesa-erp-surface)
+  :is(
+    button.primary,
+    .button-row > button,
+    .modal-footer button,
+    .modal-header-close,
+    .table-actions button,
+    .payment-row-actions button,
+    .print-queue-actions button,
+    .team-row-actions button,
+    .team-detail-actions button,
+    .team-detail-shortcuts button,
+    .production-job > button,
+    .page-title button,
+    .overview-reload,
+    .topbar .icon-button,
+    table td button:not(.catalog-thumbnail)
+  ):not([role='tab']):not([role='switch']):not(:disabled) {
+  box-shadow: var(--shadow-button);
+}
+:is(.mesa-erp, .mesa-erp-surface) button.primary:not([role='tab']):not(:disabled) {
+  box-shadow:
+    inset 0 1px 0 #ffffff40,
+    inset 0 -2px 0 #0003,
+    0 1px 2px #0003;
+}
+:is(.mesa-erp, .mesa-erp-surface) button:not(:disabled):active {
+  /* Applied only to buttons with relief above; flat controls remain flat. */
+  --shadow-button: var(--shadow-button-pressed);
+}
+:is(.mesa-erp, .mesa-erp-surface) button.primary:not([role='tab']):not(:disabled):active {
+  box-shadow: var(--shadow-button-pressed);
+}
+:is(.mesa-erp, .mesa-erp-surface) button:disabled {
+  box-shadow: none;
+}
+@media (hover: hover) {
+  :is(.mesa-erp, .mesa-erp-surface) button.primary:not([role='tab']):not(:disabled):hover {
+    box-shadow:
+      inset 0 1px 0 #ffffff50,
+      inset 0 -2px 0 #0004,
+      0 2px 4px #0003;
+  }
+  :is(.mesa-erp, .mesa-erp-surface) button:not(:disabled):hover {
+    --shadow-button: var(--shadow-button-hover);
+  }
+  :is(.mesa-erp, .mesa-erp-surface) button:not(:disabled):hover:active {
+    --shadow-button: var(--shadow-button-pressed);
+  }
+  :is(.mesa-erp, .mesa-erp-surface) button.primary:not([role='tab']):not(:disabled):hover:active {
+    box-shadow: var(--shadow-button-pressed);
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  :is(.mesa-erp, .mesa-erp-surface) button {
+    transition:
+      background-color var(--motion-fast) var(--motion-ease),
+      border-color var(--motion-fast) var(--motion-ease),
+      color var(--motion-fast) var(--motion-ease),
+      box-shadow var(--motion-fast) var(--motion-ease);
+  }
+  .mesa-erp-surface.overlay {
+    animation: erp-overlay-in var(--motion-fast) ease-out;
+  }
+  .mesa-erp-surface.overlay > .modal {
+    animation: erp-dialog-in var(--motion-enter) var(--motion-ease);
+  }
+  .mesa-erp-surface:is(.branch-menu, .receipt-action-menu, .select-popup, .ai-chat-panel),
+  .mesa-erp :is(.notification-panel, .erp-utilities-panel) {
+    animation: erp-popover-in var(--motion-fast) var(--motion-ease);
+  }
+}
+/* No retained transform after opening: PDF sizing, focus, sticky footers and
+   camera geometry continue to use their stable layout bounds. */
+@keyframes erp-overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes erp-dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes erp-popover-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  :is(.mesa-erp, .mesa-erp-surface) button {
+    transition: none;
+  }
+  .mesa-erp-surface.overlay,
+  .mesa-erp-surface.overlay > .modal,
+  .mesa-erp-surface:is(.branch-menu, .receipt-action-menu, .select-popup, .ai-chat-panel),
+  .mesa-erp :is(.notification-panel, .erp-utilities-panel) {
+    animation: none;
+  }
+}

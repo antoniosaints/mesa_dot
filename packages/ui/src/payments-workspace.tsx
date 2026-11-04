@@ -246,16 +246,15 @@ export function PaymentsWorkspace({ can }: { can: (permission: string) => boolea
             tone: 'amber',
           },
         ].map((k) => (
-          <section key={k.label} className={'panel payment-kpi ' + k.tone}>
-            <span className="payment-kpi-icon">
-              <k.icon size={21} />
-            </span>
-            <div>
-              <span>{k.label}</span>
-              <strong>{records ? k.value : '—'}</strong>
-              <small>{k.hint}</small>
-            </div>
-          </section>
+          <StatCard
+            key={k.label}
+            className={'panel payment-kpi ' + k.tone}
+            iconClassName="payment-kpi-icon"
+            label={k.label}
+            value={records ? k.value : '—'}
+            detail={k.hint}
+            icon={<k.icon size={21} />}
+          />
         ))}
       </div>
       <section className="panel payments-panel" aria-busy={loading}>
@@ -316,7 +315,7 @@ export function PaymentsWorkspace({ can }: { can: (permission: string) => boolea
             >
               <Icon name={icon} size={16} />
               {label}
-              <span>{records ? groupCount(id) : '—'}</span>
+              <span className="system-tab-count">{records ? groupCount(id) : '—'}</span>
             </button>
           ))}
         </div>
@@ -857,3 +856,4 @@ function RefundDialog({
     </Modal>
   );
 }
+import { StatCard } from './data-display.js';

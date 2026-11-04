@@ -1,5 +1,10 @@
 import { createHash, createHmac, randomBytes } from 'node:crypto';
 import {
+  reserveGatewayOperation,
+  runGatewayOperation,
+  gatewaySystem,
+} from './gateway-operations.js';
+import {
   db,
   rows,
   sql,
@@ -172,24 +177,34 @@ function readToken(response: Row, previous?: MercadoCredentials): MercadoCredent
   };
 }
 export async function completeMercado(
-  s: Scope,
+  actor: Actor,
   stateId: string,
   code: string | undefined,
   denied: boolean,
 ) {
-  complementAdmin(s);
-  const state = await s.get('complement_oauth_states', stateId, true);
-  ensure(
-    !state.used_at &&
-      new Date(String(state.expires_at) + 'Z').getTime() > Date.now() &&
-      state.initiated_by === s.actor.id,
-    'FORBIDDEN',
-    'Autorização expirada ou já utilizada.',
-    403,
+  const state = await atomic(
+    actor,
+    crypto.randomUUID(),
+    'complement.oauth.claim',
+    { stateId },
+    async (s) => {
+      complementAdmin(s);
+      const state = await s.get('complement_oauth_states', stateId, true);
+      ensure(
+        !state.used_at &&
+          new Date(String(state.expires_at) + 'Z').getTime() > Date.now() &&
+          state.initiated_by === actor.id,
+        'FORBIDDEN',
+        'Autorização expirada ou já utilizada.',
+        403,
+      );
+      await s.update('complement_oauth_states', state.id, { used_at: new Date() });
+      return state;
+    },
   );
-  await s.update('complement_oauth_states', state.id, { used_at: new Date() });
   if (denied) return { result: 'denied' };
   ensure(code, 'BAD_REQUEST', 'Código de autorização ausente.', 400);
+  const s = view(actor);
   const { verifier } = openOauth<{ verifier: string }>(s, state.verifier);
   const token = readToken(
     await tokenRequest({
@@ -211,54 +226,72 @@ export async function completeMercado(
     'Autorize uma conta brasileira do Mercado Pago.',
     409,
   );
-  const previous = await complement(s, 'mercadopago');
-  if (previous?.external_account_id && previous.external_account_id !== token.account_id)
-    ensure(
-      !(await s.list('payment_intents', sql`provider='mercadopago'`)).length,
-      'CONFLICT',
-      'Já existem pagamentos vinculados à conta anterior nesta filial. Reconecte a mesma conta.',
-      409,
-    );
-  await saveComplement(
-    s,
-    'mercadopago',
-    {
-      enabled: true,
-      external_account_id: token.account_id,
-      settings: {
-        nickname: String(me.nickname ?? 'Conta Mercado Pago').slice(0, 100),
-        test_mode: token.test_mode,
+  return atomic(actor, 'mp-save:' + stateId, 'complement.oauth.save', { stateId }, async (s) => {
+    complementAdmin(s);
+    const previous = await complement(s, 'mercadopago');
+    if (previous?.external_account_id && previous.external_account_id !== token.account_id)
+      ensure(
+        !(await s.list('payment_intents', sql`provider='mercadopago'`)).length,
+        'CONFLICT',
+        'Já existem pagamentos vinculados à conta anterior nesta filial. Reconecte a mesma conta.',
+        409,
+      );
+    await saveComplement(
+      s,
+      'mercadopago',
+      {
+        enabled: true,
+        external_account_id: token.account_id,
+        settings: {
+          nickname: String(me.nickname ?? 'Conta Mercado Pago').slice(0, 100),
+          test_mode: token.test_mode,
+        },
+        connected_at: new Date(),
+        last_checked_at: new Date(),
       },
-      connected_at: new Date(),
-      last_checked_at: new Date(),
-    },
-    token,
-  );
-  await s.audit('complement.connected', previous?.id ?? s.actor.establishmentId, {
-    provider: 'mercadopago',
-    account_id: token.account_id,
+      token,
+    );
+    await s.audit('complement.connected', previous?.id ?? s.actor.establishmentId, {
+      provider: 'mercadopago',
+      account_id: token.account_id,
+    });
+    return { result: 'success' };
   });
-  return { result: 'success' };
 }
-/** Refresh is committed independently of subsequent checkout/refund transactions. */
+/** A durable lease serializes refreshes without holding the venue transaction during OAuth I/O. */
 export async function prepareMercado(actor: Actor) {
   const record = await complement(view(actor), 'mercadopago');
   if (!record?.credentials) return;
   const token = credentials<MercadoCredentials>(view(actor), record);
-  if (token.expires_at > Date.now() + 60_000) return;
+  if (token.expires_at > Date.now() + 60000) return;
   mercadoUrls();
-  await atomic(actor, 'mp-refresh:' + crypto.randomUUID(), 'complement.refresh', {}, async (s) => {
-    const latest = await complement(s, 'mercadopago');
-    ensure(latest?.credentials, 'INVALID_STATE', 'Reconecte o Mercado Pago.', 409);
-    const current = credentials<MercadoCredentials>(s, latest);
-    if (current.expires_at > Date.now() + 60_000) return { refreshed: false };
-    const next = readToken(
-      await tokenRequest({ grant_type: 'refresh_token', refresh_token: current.refresh_token }),
-      current,
-    );
-    await saveComplement(s, 'mercadopago', {}, next);
-    return { refreshed: true };
-  });
+  const fingerprint = hash(record.credentials);
+  const op = await atomic(
+    gatewaySystem(actor),
+    crypto.randomUUID(),
+    'complement.refresh.reserve',
+    { fingerprint },
+    (s) =>
+      reserveGatewayOperation(s, 'TOKEN_REFRESH', record.id, 'refresh:' + fingerprint, {
+        fingerprint,
+      }),
+  );
+  await runGatewayOperation(
+    actor,
+    op.id,
+    async () =>
+      readToken(
+        await tokenRequest({ grant_type: 'refresh_token', refresh_token: token.refresh_token }),
+        token,
+      ),
+    async (s, _op, next) => {
+      const latest = await complement(s, 'mercadopago');
+      ensure(latest?.credentials, 'INVALID_STATE', 'Reconecte o Mercado Pago.', 409);
+      if (hash(latest.credentials) !== fingerprint) return { refreshed: false };
+      await saveComplement(s, 'mercadopago', {}, next);
+      return { refreshed: true };
+    },
+  );
 }
 export async function mercadoToken(s: Scope, accountId?: string, enabledOnly = false) {
   const record = await complement(s, 'mercadopago');
@@ -289,6 +322,12 @@ export async function mercadoRequest(
   init: RequestInit = {},
   accountId?: string,
 ) {
+  ensure(
+    s.tx === db,
+    'INTERNAL_ERROR',
+    'Chamadas ao provedor devem ocorrer fora da transação.',
+    500,
+  );
   const token = await mercadoToken(s, accountId);
   return providerJson(
     api + path,
@@ -308,8 +347,8 @@ export async function testMercado(s: Scope) {
   const token = await mercadoToken(s);
   const me = await mercadoRequest(s, '/users/me');
   ensure(String(me.id) === token.account_id, 'CONFLICT', 'Conta vinculada divergente.', 409);
-  await saveComplement(s, 'mercadopago', { last_checked_at: new Date() });
-  return { connected: true, account_id: token.account_id };
+  const record = await complement(s, 'mercadopago');
+  return { connected: true, account_id: token.account_id, fingerprint: hash(record!.credentials) };
 }
 /** Read the full payment and authoritative refund ledger, including search results with omitted refunds. */
 export async function mercadoPayment(s: Scope, id: string, accountId?: string) {
@@ -357,8 +396,7 @@ export function validCheckoutUrl(value: unknown) {
   );
   return url.href;
 }
-export async function createMercadoCheckout(s: Scope, intent: Row) {
-  const token = await mercadoToken(s, undefined, true);
+export async function mercadoPreference(s: Scope, intent: Row) {
   const unit = (
     await rows(
       s.tx,
@@ -388,38 +426,116 @@ export async function createMercadoCheckout(s: Scope, intent: Row) {
           String(intent.expires_at).replace(' ', 'T') +
             (/Z|[+-]\d\d:\d\d$/.test(String(intent.expires_at)) ? '' : 'Z'),
         );
-  const response = await mercadoRequest(s, '/checkout/preferences', {
-    method: 'POST',
-    headers: { 'X-Idempotency-Key': intent.provider_reference },
-    body: JSON.stringify({
-      external_reference: intent.provider_reference,
-      items: [
-        {
-          id: intent.order_id,
-          title: 'Pedido Mesa · ' + intent.order_id.slice(0, 6).toUpperCase(),
-          quantity: 1,
-          currency_id: 'BRL',
-          unit_price: Number(intent.amount),
-        },
-      ],
-      back_urls: { success: back.href, pending: back.href, failure: back.href },
-      ...(back.protocol === 'https:' ? { auto_return: 'approved' } : {}),
-      notification_url: mercadoUrls().webhook + '?unit=' + unit.id,
-      expires: true,
-      expiration_date_from: new Date().toISOString(),
-      expiration_date_to: expiry.toISOString(),
-    }),
-  });
-  const checkout_url = validCheckoutUrl(
-    token.test_mode ? response.sandbox_init_point : response.init_point,
-  );
-  await s.update('payment_intents', intent.id, {
-    checkout_url,
-    external_account_id: token.account_id,
-  });
-  return { ...intent, checkout_url, external_account_id: token.account_id };
+  return {
+    external_reference: intent.provider_reference,
+    items: [
+      {
+        id: intent.order_id,
+        title: 'Pedido Mesa · ' + intent.order_id.slice(0, 6).toUpperCase(),
+        quantity: 1,
+        currency_id: 'BRL',
+        unit_price: Number(intent.amount),
+      },
+    ],
+    back_urls: { success: back.href, pending: back.href, failure: back.href },
+    ...(back.protocol === 'https:' ? { auto_return: 'approved' } : {}),
+    notification_url: mercadoUrls().webhook + '?unit=' + unit.id,
+    expires: true,
+    expiration_date_from: new Date().toISOString(),
+    expiration_date_to: expiry.toISOString(),
+  };
 }
-export async function refundMercado(s: Scope, payment: Row, amount: string, refunded: bigint) {
+/** A preference POST with an uncertain outcome is recovered by external_reference, never blindly resent. */
+export async function createMercadoCheckout(
+  s: Scope,
+  intent: Row,
+  operation: Row,
+  beforePost: () => Promise<void>,
+) {
+  const token = await mercadoToken(s, intent.external_account_id);
+  const found = await mercadoRequest(
+    s,
+    '/checkout/preferences/search?' +
+      new URLSearchParams({ external_reference: intent.provider_reference, limit: '2' }).toString(),
+    {},
+    intent.external_account_id,
+  );
+  ensure(
+    Array.isArray(found.elements),
+    'UNAVAILABLE',
+    'Não foi possível conferir o checkout anterior.',
+    409,
+  );
+  let response: Row;
+  if (found.elements.length) {
+    ensure(
+      found.elements.length === 1,
+      'CONFLICT',
+      'Há mais de um checkout para esta referência. Conciliação necessária.',
+      409,
+    );
+    response = await mercadoRequest(
+      s,
+      '/checkout/preferences/' + encodeURIComponent(String(found.elements[0].id)),
+      {},
+      intent.external_account_id,
+    );
+    ensure(
+      response.external_reference === intent.provider_reference &&
+        String(response.collector_id) === intent.external_account_id,
+      'CONFLICT',
+      'Checkout recuperado divergente.',
+      409,
+    );
+    const total = (response.items ?? []).reduce(
+      (sum: bigint, item: Row) => sum + money(String(item.unit_price)) * BigInt(item.quantity),
+      0n,
+    );
+    ensure(
+      total === money(intent.amount),
+      'CONFLICT',
+      'Valor do checkout recuperado divergente.',
+      409,
+    );
+  } else {
+    ensure(
+      !operation.payload.provider_started_at,
+      'UNAVAILABLE',
+      'O checkout aguarda confirmação do Mercado Pago. Atualize em instantes, sem pagar novamente.',
+      409,
+    );
+    ensure(
+      new Date(String(operation.payload.preference.expiration_date_to)).getTime() > Date.now(),
+      'INVALID_STATE',
+      'Checkout expirado. Confira pagamentos antes de iniciar outro pedido.',
+      409,
+    );
+    await beforePost();
+    response = await mercadoRequest(
+      s,
+      '/checkout/preferences',
+      {
+        method: 'POST',
+        headers: { 'X-Idempotency-Key': intent.provider_reference },
+        body: JSON.stringify(operation.payload.preference),
+      },
+      intent.external_account_id,
+    );
+  }
+  return {
+    checkout_url: validCheckoutUrl(
+      token.test_mode ? response.sandbox_init_point : response.init_point,
+    ),
+    external_account_id: token.account_id,
+  };
+}
+export async function refundMercado(
+  s: Scope,
+  payment: Row,
+  amount: string,
+  refunded: bigint,
+  operationKey?: string,
+) {
   const intent = await s.get('payment_intents', payment.intent_id);
   const response = await mercadoRequest(
     s,
@@ -427,7 +543,8 @@ export async function refundMercado(s: Scope, payment: Row, amount: string, refu
     {
       method: 'POST',
       headers: {
-        'X-Idempotency-Key': hash(`mp-refund:${payment.id}:${formatDecimal(refunded)}:${amount}`),
+        'X-Idempotency-Key':
+          operationKey ?? hash(`mp-refund:${payment.id}:${formatDecimal(refunded)}:${amount}`),
       },
       body: JSON.stringify({ amount: Number(amount) }),
     },

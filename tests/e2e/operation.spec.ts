@@ -1,10 +1,34 @@
+import { expectMobileModalLayout } from './modal-layout.js';
 import { test } from './test.js';
-import { expect, type APIRequestContext, type Page } from '@playwright/test';
+import { expect, type APIRequestContext, type Locator, type Page } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 const password = 'E2ETestPasswordOnly1!';
 let fixture: any, email: string, slug: string, staffToken: string, waiterEmail: string;
 let staffSession: any;
 let database: typeof import('../../packages/database/src/index.js');
+async function expectMobileTableHeader(dialog: Locator) {
+  await expectMobileModalLayout(dialog);
+  const header = dialog.locator(':scope > .section-head');
+  const title = header.getByRole('heading', { level: 2 });
+  const close = header.getByRole('button', { name: 'Fechar', exact: true });
+  const actions = header.locator('.modal-header-actions');
+  const qr = actions.getByRole('button', { name: 'QR Code da mesa', exact: true });
+  const scan = actions.getByRole('button', { name: 'Ler ficha', exact: true });
+  for (const control of [title, close, qr, scan])
+    await expect(control).toBeInViewport({ ratio: 1 });
+  await expect(scan.locator('span', { hasText: 'Ler ficha' })).toBeVisible();
+  const [heading, closing, buttons, qrBox, scanBox] = await Promise.all(
+    [title, close, actions, qr, scan].map((element) => element.boundingBox()),
+  );
+  expect(heading!.x + heading!.width).toBeLessThanOrEqual(closing!.x);
+  expect(buttons!.y).toBeGreaterThanOrEqual(
+    Math.max(heading!.y + heading!.height, closing!.y + closing!.height),
+  );
+  expect(qrBox!.x + qrBox!.width).toBeLessThan(scanBox!.x);
+  expect(Math.abs(qrBox!.width - scanBox!.width)).toBeLessThan(1);
+  expect(Math.min(qrBox!.height, scanBox!.height)).toBeGreaterThanOrEqual(42);
+  expect(await header.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+}
 async function staffApi(request: APIRequestContext, path: string, body?: unknown) {
   const key = randomUUID();
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -202,6 +226,9 @@ test('cliente paga, solicita ficha, garçom entrega e libera mesa; eventos via w
     waiter.getByRole('status').filter({ hasText: 'Cliente na mesa ' + table.number }),
   ).toBeVisible();
   await alertTable.click();
+  await expectMobileTableHeader(
+    waiter.getByRole('dialog', { name: `Mesa ${table.number}`, exact: true }),
+  );
   await expect(waiter.getByRole('tab', { name: 'Resumo da mesa', exact: true })).toHaveAttribute(
     'aria-selected',
     'true',
@@ -215,7 +242,7 @@ test('cliente paga, solicita ficha, garçom entrega e libera mesa; eventos via w
     'true',
   );
   await expect(waiter.getByRole('tab', { name: /^Entregas/ })).toBeInViewport({ ratio: 1 });
-  await waiter.getByRole('button', { name: 'Marcar como entregue', exact: true }).click();
+  await waiter.getByRole('dialog').getByRole('button', { name: 'Entregar', exact: true }).click();
   await expect(
     waiter
       .getByRole('dialog', { name: 'Confirmar entrega da ficha' })
@@ -226,7 +253,11 @@ test('cliente paga, solicita ficha, garçom entrega e libera mesa; eventos via w
   await expect(
     waiter.getByText('Entrega confirmada. Ficha utilizada uma única vez.'),
   ).toBeVisible();
-  await expect(customer.getByText('Entregue', { exact: true })).toBeVisible({ timeout: 10000 });
+  const delivered = customer.locator('.customer-delivered-tickets');
+  await expect(delivered.locator('summary')).toContainText('Entregues', { timeout: 10000 });
+  await expect(delivered).toHaveJSProperty('open', false);
+  await delivered.locator('summary').click();
+  await expect(delivered.getByText('Entregue', { exact: true })).toBeVisible();
   await expect(alertTable).not.toHaveClass(/has-client-request/, { timeout: 10000 });
   await expect(waiter.getByRole('region', { name: 'Solicitações de clientes' })).not.toBeVisible();
   await waiter.getByRole('dialog').getByRole('button', { name: 'Fechar', exact: true }).click();
@@ -1141,10 +1172,15 @@ test('gestão da mesa mantém fluxos no layout de três painéis e no celular', 
   });
   await page.setViewportSize({ width: 1536, height: 1024 });
   await login(page, 35173);
+  const attendanceUrl = `http://127.0.0.1:35173/${fixture.slug}/salao/atendimento/${table.id}`;
+  await page.goto(attendanceUrl);
+  const dialog = page.getByRole('dialog', { name: `Mesa ${table.number}`, exact: true });
+  await expect(dialog.getByRole('heading', { name: /Gerenciar pedidos/ })).toBeVisible();
+  await dialog.getByRole('button', { name: 'Fechar', exact: true }).click();
   const toggleLight = page.getByRole('button', { name: 'Ativar tema claro', exact: true });
   if (await toggleLight.isVisible()) await toggleLight.click();
-  await page.goto(`http://127.0.0.1:35173/salao/atendimento/${table.id}`);
-  const dialog = page.getByRole('dialog', { name: `Mesa ${table.number}`, exact: true });
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+  await page.goto(attendanceUrl);
   await expect(dialog.getByRole('heading', { name: /Gerenciar pedidos/ })).toBeVisible();
   const catalog = dialog.getByLabel('Cardápio da mesa', { exact: true });
   const operation = dialog.getByLabel('Gestão do atendimento', { exact: true });
@@ -1163,6 +1199,27 @@ test('gestão da mesa mantém fluxos no layout de três painéis e no celular', 
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(operation).toBeVisible();
   await expect(catalog).not.toBeVisible();
+  for (const width of [320, 390, 600]) {
+    await page.setViewportSize({ width, height: 844 });
+    await expectMobileTableHeader(dialog);
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: '.local/screenshots/mesa-header-mobile-light.png' });
+  await operation.getByRole('button', { name: 'Gerenciar entregas', exact: true }).click();
+  const deliveries = operation.getByRole('tab', { name: 'Entregas', exact: true });
+  await expect(deliveries).toHaveAttribute('aria-selected', 'true');
+  await expect(deliveries).toBeInViewport({ ratio: 1 });
+  await page.screenshot({ path: '.local/screenshots/mesa-deliveries-active-mobile.png' });
+  await dialog.getByRole('tab', { name: 'Cardápio', exact: true }).click();
+  await expect(operation).not.toBeVisible();
+  await dialog.getByRole('tab', { name: 'Atendimento', exact: true }).click();
+  await expect(deliveries).toBeInViewport({ ratio: 1 });
+  await page.setViewportSize({ width: 360, height: 844 });
+  await expect(deliveries).toBeInViewport({ ratio: 1 });
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await expect(deliveries).toBeInViewport({ ratio: 1 });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(deliveries).toBeInViewport({ ratio: 1 });
   await dialog.getByRole('tab', { name: 'Resumo e ações', exact: true }).click();
   await expect(summary).toBeVisible();
   await summary.getByRole('button', { name: 'Adicionar pagamento', exact: true }).click();
@@ -2188,6 +2245,61 @@ test('financeiro do titular reúne receita, saldo, caixa e filtros em desktop e 
   expect(errors).toEqual([]);
 });
 
+test('recebimento Pix da mesa entra no turno selecionado e aparece separado do dinheiro físico no financeiro', async ({
+  page,
+  request,
+}) => {
+  const table = await staffApi(request, '/tables', {
+    number: 'PIX-' + randomUUID().slice(0, 5),
+    capacity: 4,
+  });
+  const register = await staffApi(request, '/cash-registers', {
+    name: 'Caixa Pix ' + randomUUID().slice(0, 5),
+  });
+  const cash = await staffApi(request, '/cash/sessions', {
+    register_id: register.id,
+    opening_amount: '0.00',
+  });
+  const draft = await staffApi(request, '/orders', {
+    table_id: table.id,
+    source: 'POS',
+    payment_policy: 'POSTPAID',
+    items: [{ product_id: fixture.products[1].id, quantity: 12, modifiers: [] }],
+  });
+  const order = await staffApi(request, `/orders/${draft.id}/confirm`, {});
+  expect(order.cash_session_id).toBe(cash.id);
+  await login(page, 35173);
+  await page.goto(`http://127.0.0.1:35173/salao/atendimento/${table.id}`);
+  const management = page.getByRole('dialog', { name: 'Mesa ' + table.number, exact: true });
+  await management.getByRole('button', { name: 'Adicionar pagamento', exact: true }).click();
+  const receiving = page.getByRole('dialog', { name: 'Registrar recebimento', exact: true });
+  await expect(
+    receiving.getByRole('combobox', { name: 'Turno de caixa', exact: true }),
+  ).toHaveValue(register.name + ' · Turno ' + cash.id.slice(0, 8));
+  const submitted = page.waitForRequest(
+    (r) => r.url().endsWith('/payments/manual') && r.method() === 'POST',
+  );
+  await receiving.getByRole('button', { name: 'Salvar', exact: true }).click();
+  expect((await submitted).postDataJSON()).toMatchObject({
+    method: 'PIX_MANUAL',
+    cash_session_id: cash.id,
+  });
+  await expect(receiving).toHaveCount(0);
+  const sessions = await staffApi(request, '/cash/sessions');
+  expect(sessions.find((s: any) => s.id === cash.id)).toMatchObject({
+    pix_sales: '60.00',
+    expected_amount: '0.00',
+  });
+  await page.goto('http://127.0.0.1:35173/financeiro');
+  const card = page.locator('.finance-cash');
+  await expect(
+    card.locator('.finance-money-list > div').filter({ hasText: 'Pix recebido' }),
+  ).toContainText('R$ 60,00');
+  await expect(card.locator('.finance-cash-received')).toContainText('R$ 60,00');
+  await expect(card.locator('.finance-cash-total')).toContainText('Dinheiro físico esperado');
+  await expect(card.locator('.finance-cash-total')).toContainText('R$ 0,00');
+});
+
 test('administrador local com todas as permissões não acessa o painel financeiro da conta', async ({
   page,
   request,
@@ -2302,7 +2414,7 @@ test('revisão em modal mostra pendências, preserva rascunho e finaliza a mesa 
     'aria-selected',
     'true',
   );
-  await management.getByRole('button', { name: 'Marcar como entregue', exact: true }).click();
+  await management.getByRole('button', { name: 'Entregar', exact: true }).click();
   await page.getByRole('button', { name: 'Confirmar entrega ao cliente', exact: true }).click();
   await expect(closeButton).toHaveClass(/is-ready/);
   expect(
@@ -2879,6 +2991,7 @@ test('detalhe do pedido exibe ficha no próprio modal, troca códigos, reimprime
   await expect
     .poll(() => page.locator('.sidebar').evaluate((n) => n.getBoundingClientRect().right))
     .toBeLessThanOrEqual(0);
+  await expectMobileModalLayout(detail);
   const last = detail.locator('.ticket-context-card').filter({ hasText: tickets[2].public_number });
   await last.getByRole('button', { name: 'Ver ficha', exact: true }).click();
   preview = detail.getByRole('region', { name: 'Ficha selecionada' });
@@ -4636,6 +4749,7 @@ test('menu de impressão do pedido abre PDF antes de baixar, recupera falha e en
     )
     .toBe(true);
   await expect(preview.getByRole('img', { name: 'Página 1 do PDF', exact: true })).toBeVisible();
+  await expectMobileModalLayout(preview);
   await expectStablePdf();
   expect(await preview.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(
     true,
@@ -4651,10 +4765,11 @@ test('menu de impressão do pedido abre PDF antes de baixar, recupera falha e en
   ).toBe(true);
   await menu.getByRole('menuitem', { name: 'Cupom · Impressora térmica', exact: true }).click();
   const thermal = page.getByRole('dialog', { name: 'Cupom do pedido', exact: true });
+  await expectMobileModalLayout(thermal);
   await thermal.getByRole('combobox', { name: 'Impressora do cupom', exact: true }).fill(tag);
   await page.getByRole('option', { name: tag + ' · recibo-menu', exact: true }).click();
   await thermal.getByRole('button', { name: 'Enviar para térmica', exact: true }).click();
-  await expect(thermal.getByRole('status')).toContainText('Cupom na fila.');
+  await expect(thermal.locator('.receipt-job')).toContainText('Cupom na fila.');
   const jobs = (await staffApi(request, '/print/jobs')).filter(
     (job: any) => job.printer_id === printer.id,
   );
@@ -4908,6 +5023,10 @@ test('cardápio online lê mesa por link ou câmera e libera a câmera ao identi
   await expect(scanner).toHaveCount(0);
   await expect(page.locator('.venue-pill')).toContainText('Mesa ' + table.number);
   await page.getByRole('button', { name: 'Pedir para retirada', exact: true }).click();
+  await page
+    .getByRole('dialog', { name: 'Trocar atendimento?', exact: true })
+    .getByRole('button', { name: 'Mudar para retirada', exact: true })
+    .click();
   await expect(
     page.getByRole('dialog', { name: 'Identificar pedido para retirada', exact: true }),
   ).toBeVisible();
@@ -5248,7 +5367,7 @@ test('QR da mesa no cabeçalho oferece prévia PDF, etiqueta, navegador e fila t
   await page.getByRole('option', { name: printer.name + ' · etiquetas', exact: true }).click();
   await qr.getByLabel('Papel térmico do QR', { exact: true }).selectOption('58');
   await qr.getByRole('button', { name: 'Imprimir na térmica', exact: true }).click();
-  await expect(qr.getByRole('status')).toContainText('QR na fila.');
+  await expect(qr.getByRole('status').filter({ hasText: 'QR na fila.' })).toBeVisible();
   const jobs = (await staffApi(request, '/print/jobs')).filter(
     (job: any) => job.source_table_id === table.id,
   );
@@ -5257,13 +5376,30 @@ test('QR da mesa no cabeçalho oferece prévia PDF, etiqueta, navegador e fila t
   await staffApi(request, '/print/jobs/' + jobs[0].id + '/cancel', {
     reason: 'Teste de etiqueta concluído',
   });
-  await expect(qr.getByRole('status')).toContainText('Impressão cancelada.');
+  await expect(qr.getByRole('status').filter({ hasText: 'Impressão cancelada.' })).toBeVisible();
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await qr.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: 'docs/screenshots/table-qr-print-mobile.png' });
   await qr.getByRole('button', { name: 'Fechar QR', exact: true }).click();
   await expect(attendance).toBeVisible();
+  await expectMobileTableHeader(attendance);
+  await attendance.getByRole('button', { name: 'QR Code da mesa', exact: true }).click();
+  await expect(
+    qr.getByRole('img', { name: 'QR Code da mesa ' + table.number, exact: true }),
+  ).toBeVisible();
+  await qr.getByRole('button', { name: 'Fechar QR', exact: true }).click();
+  await attendance.getByRole('button', { name: 'Ler ficha', exact: true }).click();
+  const scanner = page.getByRole('dialog', { name: 'Leitura rápida de fichas', exact: true });
+  await expect(scanner.getByLabel('Código da ficha', { exact: true })).toBeFocused();
+  await scanner.getByRole('button', { name: 'Concluir leitura', exact: true }).click();
+  await attendance.getByRole('button', { name: 'Fechar', exact: true }).click();
+  const dark = page.getByRole('button', { name: 'Ativar tema escuro', exact: true });
+  if (await dark.isVisible()) await dark.click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await page.goto(`http://127.0.0.1:35173/${fixture.slug}/salao/atendimento/${table.id}`);
+  await expectMobileTableHeader(attendance);
+  await page.screenshot({ path: '.local/screenshots/mesa-header-mobile-dark.png' });
   expect((await staffApi(request, '/tables/' + table.id + '/session')).session).toBeNull();
   expect(errors).toEqual([]);
 });

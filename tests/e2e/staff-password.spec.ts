@@ -1,3 +1,4 @@
+import { expectMobileModalLayout } from './modal-layout.js';
 import { test } from './test.js';
 import { expect, type Page } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
@@ -83,12 +84,15 @@ test('organiza as ações e troca a senha com confirmação, encerrando as sess�
   const note = await detail.locator('.team-security-note').boundingBox();
   expect(first!.y - note!.y - note!.height).toBeGreaterThanOrEqual(19);
   await detail.screenshot({ path: '.local/screenshots/team-detail-actions-desktop.png' });
+  await page.setViewportSize({ width: 320, height: 900 });
+  await expectMobileModalLayout(detail);
   await detail.getByRole('button', { name: 'Alterar senha', exact: true }).click();
   const reset = page.getByRole('dialog', {
     name: 'Alterar senha · Funcionário de teste',
     exact: true,
   });
   const replacement = 'EmployeeReplacementOnly1!';
+  await expectMobileModalLayout(reset);
   await reset.getByLabel('Nova senha', { exact: true }).fill(replacement);
   await reset.getByLabel('Confirmar nova senha', { exact: true }).fill('DifferentConfirmation1!');
   await reset.getByRole('button', { name: 'Salvar nova senha', exact: true }).click();
@@ -133,6 +137,7 @@ test('organiza as ações e troca a senha com confirmação, encerrando as sess�
       .locator('.team-detail-controls button')
       .evaluateAll((elements) => elements.map((element) => element.getBoundingClientRect().width));
     expect(Math.max(...buttons) - Math.min(...buttons)).toBeLessThanOrEqual(1);
+    await expectMobileModalLayout(detail);
     await detail.screenshot({
       path: '.local/screenshots/team-detail-actions-mobile-' + theme + '.png',
     });
