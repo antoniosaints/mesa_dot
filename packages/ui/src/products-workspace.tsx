@@ -10,6 +10,7 @@ import { useFormDialog } from './forms.js';
 import { ProductManagementModal } from './product-management.js';
 import { ProductPhotoImage, ProductPhotoPreview } from './product-photo.js';
 import { normalizeOrderSearch } from './orders-view.js';
+import { productLabel } from './product-label.js';
 
 const stockLabels: Record<string, string> = {
   NO_CONTROL: 'Sem controle',
@@ -60,13 +61,20 @@ export function ProductsWorkspace({
             : p.stock_policy === stock)) &&
         (production === 'ALL' || Boolean(p.requires_production) === (production === 'YES')) &&
         normalizeOrderSearch(
-          [p.name, p.description, p.id, categoryName(p.category_id)].join(' '),
+          [
+            productLabel(p),
+            p.name,
+            p.default_variant_name,
+            p.description,
+            p.id,
+            categoryName(p.category_id),
+          ].join(' '),
         ).includes(query),
     )
     .sort((a, b) =>
       sort.startsWith('price')
         ? (Number(a.price) - Number(b.price)) * (sort.endsWith('desc') ? -1 : 1)
-        : a.name.localeCompare(b.name, 'pt-BR', { numeric: true }) *
+        : productLabel(a).localeCompare(productLabel(b), 'pt-BR', { numeric: true }) *
           (sort.endsWith('desc') ? -1 : 1),
     );
   const { rows: visible } = paginate(filtered, page, size);
@@ -124,7 +132,7 @@ export function ProductsWorkspace({
           <input
             type="search"
             aria-label="Buscar em Produtos"
-            placeholder="Buscar produtos, categorias ou código…"
+            placeholder="Buscar produtos, variações, categorias ou código…"
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
@@ -289,6 +297,7 @@ export function ProductsWorkspace({
                 </thead>
                 <tbody>
                   {visible.map((p) => {
+                    const label = productLabel(p);
                     const quantity = balances
                       .filter((b) => b.product_id === p.id)
                       .reduce(
@@ -304,7 +313,7 @@ export function ProductsWorkspace({
                               <button
                                 type="button"
                                 className="catalog-thumbnail catalog-photo-button"
-                                aria-label={'Ver foto de ' + p.name}
+                                aria-label={'Ver foto de ' + label}
                                 title="Ampliar foto"
                                 onClick={() => setPhoto(p)}
                               >
@@ -322,7 +331,7 @@ export function ProductsWorkspace({
                               }}
                             >
                               <span>
-                                <strong>{p.name}</strong>
+                                <strong>{label}</strong>
                                 <small>Cód. {p.id.slice(0, 8).toUpperCase()}</small>
                               </span>
                             </button>
@@ -357,7 +366,7 @@ export function ProductsWorkspace({
                           <button
                             role="switch"
                             aria-checked={Boolean(p.enabled)}
-                            aria-label={'Disponibilidade de ' + p.name}
+                            aria-label={'Disponibilidade de ' + label}
                             title={p.enabled ? 'Desativar produto' : 'Ativar produto'}
                             className="catalog-switch"
                             disabled={busy || Boolean(editing)}
@@ -380,14 +389,14 @@ export function ProductsWorkspace({
                         <td>
                           <div className="catalog-row-actions">
                             <button
-                              aria-label={'Editar ' + p.name}
+                              aria-label={'Editar ' + label}
                               title="Editar produto"
                               onClick={() => edit(p)}
                             >
                               <Icon name="edit" size={16} />
                             </button>
                             <button
-                              aria-label={'Duplicar ' + p.name}
+                              aria-label={'Duplicar ' + label}
                               title="Duplicar cadastro (sem variações)"
                               onClick={() => {
                                 const { id: _id, ...copy } = p;

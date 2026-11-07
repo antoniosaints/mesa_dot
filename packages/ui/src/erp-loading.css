@@ -1,0 +1,94 @@
+/* Out of document flow: loading never changes content width or scroll height. */
+.mesa-erp .page-content {
+  position: relative;
+}
+.mesa-erp .erp-menu-transition {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: clamp(32px, 10vh, 96px) 12px 12px;
+  pointer-events: none;
+}
+.mesa-erp .erp-menu-transition-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 100%;
+  padding: 12px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: 0 8px 32px #0002;
+  font-size: 13px;
+  font-weight: 600;
+}
+.mesa-erp .erp-menu-transition svg {
+  flex: 0 0 72px;
+  color: var(--color-brand-ink);
+}
+.mesa-erp .erp-loading-table {
+  fill: var(--color-brand);
+  fill-opacity: 0.08;
+}
+.mesa-erp .erp-loading-seat {
+  fill: currentColor;
+  fill-opacity: 0.12;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .mesa-erp .erp-menu-transition-card {
+    animation: erp-popover-in var(--motion-fast) var(--motion-ease);
+  }
+  .mesa-erp .erp-loading-seat {
+    animation: erp-seat-pulse 1.2s ease-in-out infinite;
+  }
+  .mesa-erp .seat-two {
+    animation-delay: 150ms;
+  }
+  .mesa-erp .seat-three {
+    animation-delay: 300ms;
+  }
+  .mesa-erp .seat-four {
+    animation-delay: 450ms;
+  }
+  .mesa-erp .erp-loading-receipt {
+    animation: erp-receipt-float 1.2s ease-in-out infinite;
+  }
+  .mesa-erp :is(.erp-loading-line, .erp-loading-check) {
+    stroke-dasharray: 1;
+    animation: erp-receipt-write 1.2s ease-in-out infinite;
+  }
+  .mesa-erp .erp-loading-check {
+    animation-delay: 180ms;
+  }
+}
+@keyframes erp-seat-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  45% {
+    opacity: 1;
+  }
+}
+@keyframes erp-receipt-float {
+  0%,
+  100% {
+    transform: translateY(1px);
+  }
+  50% {
+    transform: translateY(-1px);
+  }
+}
+@keyframes erp-receipt-write {
+  0% {
+    stroke-dashoffset: 1;
+  }
+  50%,
+  100% {
+    stroke-dashoffset: 0;
+  }
+}

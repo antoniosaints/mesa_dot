@@ -107,6 +107,15 @@ export function tenantPwa(surface: PwaSurface): Plugin {
   }
   return {
     name: 'mesa-tenant-pwa',
+    // Editors can truncate then rewrite a module. Do not cache that temporary
+    // empty source and announce an HMR update with missing named exports.
+    config: () => ({
+      server: {
+        watch: {
+          awaitWriteFinish: { stabilityThreshold: 150, pollInterval: 20 },
+        },
+      },
+    }),
     async generateBundle() {
       if (surface !== 'customer')
         this.emitFile({

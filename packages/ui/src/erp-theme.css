@@ -3,6 +3,7 @@
 @import './erp-workspaces.css';
 @import './erp-tabs.css';
 @import './erp-motion.css';
+@import './erp-loading.css';
 
 /* Optional management layout. Legacy CSS remains the default. */
 .mesa-erp {

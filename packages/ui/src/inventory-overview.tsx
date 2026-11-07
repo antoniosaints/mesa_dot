@@ -16,6 +16,8 @@ import { ProductManagementModal } from './product-management.js';
 import { StockLocations } from './product-configuration.js';
 import { stockQuantity } from './stock-quantity.js';
 import { normalizeOrderSearch } from './orders-view.js';
+import { productLabel } from './product-label.js';
+import { useStockLocationEditor } from './stock-location-editor.js';
 export function InventoryOverview({
   balances,
   catalog,
@@ -44,13 +46,17 @@ export function InventoryOverview({
       (!location || b.location_id === location) &&
       normalizeOrderSearch(
         [
-          products.find((p) => p.id === b.product_id)?.name,
+          productLabel(
+            products.find((p) => p.id === b.product_id) ?? { name: b.product_id },
+            variants.find((v) => v.id === b.variant_id)?.name,
+          ),
           variants.find((v) => v.id === b.variant_id)?.name,
           locations.find((l) => l.id === b.location_id)?.name,
         ].join(' '),
       ).includes(normalizeOrderSearch(search)),
   );
   const paging = useClientPagination(rows, JSON.stringify({ search, location }));
+  const locationEditor = useStockLocationEditor(locations, balances, onChange);
   return (
     <section className="inventory-workspace">
       <PageTitle
@@ -125,7 +131,10 @@ export function InventoryOverview({
           <TableLoading label="Carregando estoques…" />
         ) : rows.length ? (
           <div className="data-table">
-            <table className="inventory-card-table inventory-overview-table">
+            <table
+              className="inventory-card-table inventory-overview-table"
+              aria-label="Saldos por produto e local"
+            >
               <thead>
                 <tr>
                   <th>Produto</th>
@@ -142,7 +151,10 @@ export function InventoryOverview({
                   <tr key={b.id}>
                     <td data-label="Produto">
                       <strong>
-                        {products.find((p) => p.id === b.product_id)?.name ?? b.product_id}
+                        {productLabel(
+                          products.find((p) => p.id === b.product_id) ?? { name: b.product_id },
+                          variants.find((v) => v.id === b.variant_id)?.name,
+                        )}
                       </strong>
                     </td>
                     <td data-label="Variação">
@@ -172,17 +184,37 @@ export function InventoryOverview({
                       )}
                     </td>
                     <td data-label="Ações">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setProduct(
-                            products.find((p) => p.id === b.product_id) ?? { id: b.product_id },
-                          )
-                        }
-                      >
-                        <Icon name="inventory" size={16} />
-                        Gerenciar produto
-                      </button>
+                      <div className="button-row">
+                        {canReplenish && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              locationEditor.open(
+                                b,
+                                productLabel(
+                                  products.find((p) => p.id === b.product_id) ?? {
+                                    name: b.product_id,
+                                  },
+                                  variants.find((v) => v.id === b.variant_id)?.name,
+                                ),
+                              )
+                            }
+                          >
+                            <Icon name="folder" size={16} /> Alterar local
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setProduct(
+                              products.find((p) => p.id === b.product_id) ?? { id: b.product_id },
+                            )
+                          }
+                        >
+                          <Icon name="inventory" size={16} />
+                          Gerenciar produto
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -234,6 +266,7 @@ export function InventoryOverview({
           onChange={onChange}
         />
       )}
+      {locationEditor.dialog}
     </section>
   );
 }

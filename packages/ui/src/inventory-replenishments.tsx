@@ -14,6 +14,7 @@ import { Pagination, TableLoading, useClientPagination } from './pagination.js';
 import { operationTime, shortId } from './operation-format.js';
 import { replenishmentCosts } from '../../shared/src/replenishment.js';
 import { useToasts } from './toasts.js';
+import { productLabel } from './product-label.js';
 type Selection = Record<string, { quantity: string; unit_cost: string }>;
 export function ReplenishmentModal({
   balances,
@@ -49,7 +50,10 @@ export function ReplenishmentModal({
     .filter((balance) => !variants.get(balance.variant_id)?.deleted_at)
     .map((balance) => ({
       ...balance,
-      product_name: products.get(balance.product_id)?.name ?? 'Produto',
+      product_name: productLabel(
+        products.get(balance.product_id) ?? { name: 'Produto' },
+        variants.get(balance.variant_id)?.name,
+      ),
       unit_code: products.get(balance.product_id)?.unit_code ?? 'UN',
       variant_name: variants.get(balance.variant_id)?.name ?? 'Compartilhado',
       location_name: locations.find((item) => item.id === balance.location_id)?.name ?? 'Local',

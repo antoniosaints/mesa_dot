@@ -737,7 +737,7 @@ test('pedido guiado, comanda individual e fichas mantêm contexto em links diret
     .getByRole('dialog')
     .getByRole('combobox', { name: 'Variação do produto' })
     .fill('Com gás');
-  await page.getByRole('option', { name: 'Com gás · R$ 6,00', exact: true }).click();
+  await page.getByRole('option', { name: 'Água mineral · Com gás · R$ 6,00', exact: true }).click();
   await page
     .getByRole('dialog')
     .getByRole('button', { name: 'Adicionar ao pedido', exact: true })
@@ -1574,7 +1574,9 @@ test('pedido compacto acumula cliques e preserva personalizações distintas', a
       .getByLabel('Cardápio da mesa', { exact: true })
       .getByRole('button', { name: new RegExp(custom.name) })
       .click();
-    const picker = page.getByRole('dialog', { name: 'Adicionar · ' + custom.name, exact: true });
+    const picker = page
+      .getByRole('dialog')
+      .filter({ has: page.getByRole('combobox', { name: 'Variação do produto', exact: true }) });
     await picker.getByRole('combobox', { name: 'Variação do produto' }).fill('Grande');
     await page.getByRole('option', { name: /Grande/ }).click();
     await picker.getByRole('button', { name: 'Adicionar ao pedido', exact: true }).click();
@@ -5794,7 +5796,7 @@ test('quantidade do cliente respeita saldo próprio da variação e estoque atua
   await page.goto(`http://127.0.0.1:35174/${fixture.slug}/`);
   await page.getByLabel('Buscar produto', { exact: true }).fill(product.name);
   await page.getByRole('button', { name: product.name, exact: true }).click();
-  const modal = page.getByRole('dialog', { name: product.name, exact: true });
+  const modal = page.locator('.customer-product-modal');
   const quantity = modal.getByLabel('Quantidade do produto', { exact: true });
   const add = modal.getByRole('button', { name: 'Adicionar ao pedido', exact: false });
   await quantity.fill('2');
@@ -5803,14 +5805,16 @@ test('quantidade do cliente respeita saldo próprio da variação e estoque atua
     modal.getByRole('button', { name: 'Aumentar quantidade', exact: true }),
   ).toBeDisabled();
   await modal.getByRole('combobox', { name: 'Variação', exact: true }).click();
-  await page.getByRole('option', { name: 'Especial · R$ 17,00', exact: true }).click();
+  await page
+    .getByRole('option', { name: product.name + ' · Especial · R$ 17,00', exact: true })
+    .click();
   await expect(add).toBeDisabled();
   await modal.getByRole('button', { name: 'Diminuir quantidade', exact: true }).click();
   await expect(quantity).toHaveValue('1');
   await expect(add).toBeEnabled();
   await expect(modal.locator('.customer-product-subtotal')).toContainText('R$ 17,00');
   await modal.getByRole('combobox', { name: 'Variação', exact: true }).click();
-  await page.getByRole('option', { name: 'Padrão · R$ 11,00', exact: true }).click();
+  await page.getByRole('option', { name: product.name + ' · R$ 11,00', exact: true }).click();
   await quantity.fill('2');
   await staffApi(request, '/inventory/adjustments', {
     balance_id: base.id,

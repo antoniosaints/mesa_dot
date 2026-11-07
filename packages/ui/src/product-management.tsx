@@ -124,6 +124,7 @@ export function ProductManagementModal({
     {
       key: 'stock_location_id',
       label: 'Local de baixa do produto',
+      hint: 'Origem dos próximos pedidos. Para mudar o depósito de um saldo existente, use Alterar local em Estoques e locais.',
       type: 'select',
       initial: '',
       options: [
@@ -161,6 +162,14 @@ export function ProductManagementModal({
     const data = await api('/products/' + productId + '/management');
     setContext(data);
     setPhotoProduct(data.product);
+    const source = data.product.stock_location_id ?? '';
+    setValues((current) =>
+      current.stock_location_id === initial.stock_location_id
+        ? { ...current, stock_location_id: source }
+        : current,
+    );
+    setInitial((current) => ({ ...current, stock_location_id: source }));
+    await onChange();
   }
   useEffect(() => {
     if (!productId) return;
@@ -236,6 +245,7 @@ export function ProductManagementModal({
               {
                 key: 'stock_location_id',
                 label: 'Local de baixa da variação',
+                hint: 'Origem dos próximos pedidos. Para corrigir o depósito do saldo existente, use Alterar local em Estoques e locais.',
                 type: 'select' as const,
                 options: [
                   { id: '', name: 'Usar origem do produto' },

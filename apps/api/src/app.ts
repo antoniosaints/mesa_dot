@@ -59,6 +59,7 @@ import {
   replenishmentQuery,
 } from './replenishments.js';
 import { initializeProductStock } from './initial-stock.js';
+import { changeStockLocation } from './stock-location.js';
 import { registerPwa, pwaSettings, pwaSettingsSchema, updatePwaSettings } from './pwa.js';
 import { assignSlug } from '../../../packages/database/src/slugs.js';
 import { teamMembers, roleAccessSurfaces } from './team.js';
@@ -918,6 +919,13 @@ export async function buildApp(options: { realtime?: boolean; logger?: boolean }
   );
   route('GET', '/inventory/balances', 'inventory.view', null, async (s) =>
     s.list('stock_balances'),
+  );
+  route(
+    'PATCH',
+    '/stock-balances/:id/location',
+    'inventory.adjust',
+    strict({ location_id: uuid, version: z.number().int().positive() }),
+    (s, b, req) => changeStockLocation(s, id(req), b),
   );
   route('GET', '/inventory/movements', 'inventory.view', null, async (s) =>
     s.list('stock_movements'),

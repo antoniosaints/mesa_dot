@@ -16,6 +16,7 @@ import { RecordTag } from './record-tags.js';
 import { ProductPicker } from './pos.js';
 import { mergeDraftLine, MAX_DRAFT_QUANTITY, type DraftLine } from './draft-cart.js';
 import { normalizeOrderSearch } from './orders-view.js';
+import { productLabel, productSearchText } from './product-label.js';
 import { TableLoading } from './pagination.js';
 export function CounterSaleModal({
   onClose,
@@ -60,7 +61,7 @@ export function CounterSaleModal({
           if (!product) return line;
           return {
             ...line,
-            name: product.name + (variant ? ' · ' + variant.name : ''),
+            name: productLabel(product, variant?.name),
             price:
               Number(variant?.price ?? product.price) +
               line.modifiers.reduce(
@@ -105,7 +106,9 @@ export function CounterSaleModal({
   const products: Data[] = (catalog?.products ?? []).filter(
     (p: Data) =>
       (!category || p.category_id === category) &&
-      normalizeOrderSearch(p.name).includes(normalizeOrderSearch(search)),
+      normalizeOrderSearch(productSearchText(p, catalog?.variants)).includes(
+        normalizeOrderSearch(search),
+      ),
   );
   return (
     <Modal
@@ -201,11 +204,11 @@ export function CounterSaleModal({
                       type="button"
                       key={product.id}
                       className="counter-product"
-                      aria-label={'Adicionar ' + product.name}
+                      aria-label={'Adicionar ' + productLabel(product)}
                       aria-disabled={!productHasStock(catalog, cart, product.id)}
                       onClick={() => {
                         if (!productHasStock(catalog, cart, product.id)) {
-                          toast.error('Sem estoque disponível para ' + product.name + '.');
+                          toast.error('Sem estoque disponível para ' + productLabel(product) + '.');
                           return;
                         }
                         if (
@@ -220,13 +223,13 @@ export function CounterSaleModal({
                             quantity: 1,
                             modifiers: [],
                             notes: '',
-                            name: product.name,
+                            name: productLabel(product),
                             price: Number(product.price),
                           });
                       }}
                     >
                       <span>
-                        <strong>{product.name}</strong>
+                        <strong>{productLabel(product)}</strong>
                         <small>
                           {product.requires_production || product.stock_policy === 'ON_PRODUCTION'
                             ? 'Requer preparo'

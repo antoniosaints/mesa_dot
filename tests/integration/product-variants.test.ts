@@ -4,6 +4,13 @@ import { buildApp } from '../../apps/api/src/app.js';
 import { migrate } from '../../packages/database/src/migrate.js';
 import { provision } from '../../packages/database/src/provision.js';
 import { pool, view, sql } from '../../packages/database/src/index.js';
+import { printJobDocument } from '../../apps/api/src/printing.js';
+import { ticketPdf } from '../../apps/api/src/ticket-pdf.js';
+import { escpos, type TicketPrintDocument } from '../../apps/print-agent/src/escpos.js';
+import { receiptHtml, type ReceiptDocument } from '../../packages/shared/src/receipt.js';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 let app: Awaited<ReturnType<typeof buildApp>>,
   fixture: Awaited<ReturnType<typeof provision>>,
   token: string,
@@ -88,6 +95,133 @@ beforeAll(async () => {
 afterAll(async () => {
   await app?.close();
   await pool.end();
+});
+it('mantém o tamanho original nas fichas, cozinha, entregas e cupons de 58/80 mm após editar o catálogo', async () => {
+  const name = 'Cerveja artesanal da casa com receita especial e garrafa retornável';
+  const product = await call('POST', '/products', {
+    name,
+    default_variant_name: 'Garrafa 600 ml',
+    price: '15.00',
+    stock_policy: 'NO_CONTROL',
+    requires_production: true,
+    sector: 'cozinha',
+  });
+  const variant = await call('POST', '/product-variants', {
+    product_id: product.id,
+    name: 'Garrafa 1 litro',
+    price: '25.00',
+  });
+  const printer = await call('POST', '/printers', {
+    name: 'Conferência de tamanhos',
+    sector: 'cozinha',
+  });
+  const order = await call('POST', '/orders', {
+    table_id: fixture.tables[2].id,
+    source: 'POS',
+    payment_policy: 'POSTPAID',
+    items: [
+      { product_id: product.id, quantity: 1, modifiers: [] },
+      { product_id: product.id, variant_id: variant.id, quantity: 1, modifiers: [] },
+    ],
+  });
+  await call('POST', '/orders/' + order.id + '/confirm', {});
+  const original = await call('GET', '/orders/' + order.id);
+  const names = ['Garrafa 600 ml', 'Garrafa 1 litro'].map((size) => name + ' - ' + size);
+  expect(original.items.map((item: any) => item.name_snapshot).sort()).toEqual([...names].sort());
+  await call('PATCH', '/products/' + product.id, {
+    name: 'Produto renomeado',
+    default_variant_name: 'Novo tamanho',
+    price: '99.00',
+  });
+  await call('PATCH', '/product-variants/' + variant.id, {
+    name: 'Outro tamanho',
+    price: '199.00',
+  });
+  const ids = new Set(original.tickets.map((ticket: any) => ticket.id));
+  const jobs = (await call('GET', '/production/jobs')).filter((job: any) => ids.has(job.ticket_id));
+  expect(jobs.map((job: any) => job.product).sort()).toEqual([...names].sort());
+  const tickets = await Promise.all(
+    original.tickets.map((ticket: any) => call('GET', '/tickets/' + ticket.id)),
+  );
+  expect(tickets.map((ticket: any) => ticket.product).sort()).toEqual([...names].sort());
+  const s = view(fixture.actor);
+  const ticketJobs = (await s.list('print_jobs')).filter((job) => ids.has(job.ticket_id));
+  expect(ticketJobs).toHaveLength(2);
+  for (const job of ticketJobs) {
+    const document = await printJobDocument(s, job);
+    expect(names).toContain(document.product);
+    expect(escpos(document as TicketPrintDocument).toString('ascii')).toContain(
+      document.product.normalize('NFD').replace(/[\u0300-\u036f]/g, ''),
+    );
+  }
+  const directory = resolve('.local/variant-flow');
+  await mkdir(directory, { recursive: true });
+  const pdfText = async (data: Uint8Array) => {
+    const task = getDocument({ data: new Uint8Array(data), useSystemFonts: true });
+    try {
+      const document = await task.promise;
+      const text: string[] = [];
+      for (let number = 1; number <= document.numPages; number++) {
+        const page = await document.getPage(number);
+        const content = await page.getTextContent();
+        text.push(...content.items.map((item) => ('str' in item ? item.str : '')));
+      }
+      return text.join(' ').replace(/\s+/g, ' ').trim();
+    } finally {
+      await task.destroy();
+    }
+  };
+  for (const paper of [58, 80] as const) {
+    for (const [index, ticket] of tickets.entries()) {
+      const file = resolve(directory, `ficha-${index}-${paper}mm.pdf`);
+      const bytes = await ticketPdf(ticket, paper, '2026-11-04T12:00:00Z');
+      await writeFile(file, bytes);
+      expect(await pdfText(bytes)).toContain(ticket.product);
+    }
+    for (const [resource, id] of [
+      ['orders', order.id],
+      ['tabs', original.tab_id],
+    ]) {
+      const document = await call('GET', `/${resource}/${id}/receipt?paper_width=${paper}`);
+      expect(document.items.map((item: any) => item.name).sort()).toEqual([...names].sort());
+      const printed = await call('POST', `/${resource}/${id}/receipt/print`, {
+        printer_id: printer.id,
+        paper_width: paper,
+      });
+      const payload = (await printJobDocument(
+        s,
+        await s.get('print_jobs', printed.id),
+      )) as ReceiptDocument;
+      expect(payload.items.map((item) => item.name).sort()).toEqual([...names].sort());
+      const nativeText = escpos(payload).toString('ascii').replace(/\s+/g, ' ');
+      for (const expected of names) {
+        expect(nativeText).toContain(expected.normalize('NFD').replace(/[\u0300-\u036f]/g, ''));
+        expect(receiptHtml(payload).replace(/\s+/g, ' ')).toContain(expected);
+      }
+    }
+    const pdf = await req('GET', `/tabs/${original.tab_id}/receipt.pdf?paper_width=${paper}`);
+    expect(pdf.statusCode).toBe(200);
+    const file = resolve(directory, `cupom-comanda-${paper}mm.pdf`);
+    await writeFile(file, pdf.rawPayload);
+    const text = await pdfText(pdf.rawPayload);
+    for (const expected of names) expect(text).toContain(expected);
+  }
+  for (const job of jobs) {
+    await call('POST', '/production/jobs/' + job.id + '/status', { status: 'PREPARING' });
+    await call('POST', '/production/jobs/' + job.id + '/status', { status: 'READY' });
+  }
+  const deliveries = (await call('GET', '/tickets', undefined, waiterToken)).filter((ticket: any) =>
+    ids.has(ticket.id),
+  );
+  expect(deliveries.map((ticket: any) => ticket.product).sort()).toEqual([...names].sort());
+  for (const ticket of deliveries) {
+    expect(ticket.status).toBe('AVAILABLE');
+    const document = await call('GET', '/tickets/' + ticket.id, undefined, waiterToken);
+    await call('POST', '/tickets/' + ticket.id + '/redeem', { token: document.token }, waiterToken);
+  }
+  expect(
+    (await call('GET', '/orders/' + order.id)).items.map((item: any) => item.name_snapshot).sort(),
+  ).toEqual([...names].sort());
 });
 it('cria uma variação padrão obrigatória, permite renomear e não aceita apagar o seu nome', async () => {
   const product = await call('POST', '/products', {

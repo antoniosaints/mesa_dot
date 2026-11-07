@@ -1,5 +1,7 @@
 import { TableQrButton } from './table-qr-print.js';
 import { ProductPhotoImage } from './product-photo.js';
+import { productLabel, productSearchText } from './product-label.js';
+import { normalizeOrderSearch } from './orders-view.js';
 import {
   StockHint,
   productHasStock,
@@ -73,7 +75,7 @@ export function ProductPicker({
     );
   return (
     <Modal
-      title={'Adicionar · ' + product.name}
+      title={'Adicionar · ' + productLabel(product, selected?.name)}
       dirty={quantity !== '1' || Boolean(variant || modifiers.length || notes)}
       onClose={onClose}
     >
@@ -89,13 +91,7 @@ export function ProductPicker({
             variant_id: variant || undefined,
             modifiers,
             notes,
-            name:
-              product.name +
-              (selected
-                ? ' · ' + selected.name
-                : product.default_variant_name && product.default_variant_name !== 'Padrão'
-                  ? ' · ' + product.default_variant_name
-                  : ''),
+            name: productLabel(product, selected?.name),
             price,
           });
         }}
@@ -119,7 +115,7 @@ export function ProductPicker({
               options={[
                 {
                   id: '',
-                  name: (product.default_variant_name ?? 'Padrão') + ' · ' + brl(product.price),
+                  name: productLabel(product) + ' · ' + brl(product.price),
                   disabled: remainingStock(catalog, cart, product.id) < 1,
                 },
                 ...catalog.variants
@@ -127,7 +123,7 @@ export function ProductPicker({
                   .map((item: Data) => ({
                     id: item.id,
                     name:
-                      item.name +
+                      productLabel(product, item.name) +
                       ' · ' +
                       brl(item.price) +
                       (remainingStock(catalog, cart, product.id, item.id) < 1
@@ -679,7 +675,9 @@ export function TablePanel({
                   (item: Data) =>
                     item.enabled &&
                     (!category || item.category_id === category) &&
-                    item.name.toLowerCase().includes(search.toLowerCase()),
+                    normalizeOrderSearch(productSearchText(item, catalog.variants)).includes(
+                      normalizeOrderSearch(search),
+                    ),
                 )
                 .map((item: Data) => (
                   <button
@@ -694,7 +692,7 @@ export function TablePanel({
                     aria-disabled={!productHasStock(catalog, cart, item.id)}
                     onClick={() => {
                       if (!productHasStock(catalog, cart, item.id)) {
-                        toast.error('Sem estoque disponível para ' + item.name + '.');
+                        toast.error('Sem estoque disponível para ' + productLabel(item) + '.');
                         return;
                       }
                       showPhase('order', 'operation');
@@ -710,7 +708,7 @@ export function TablePanel({
                           quantity: 1,
                           modifiers: [],
                           notes: '',
-                          name: item.name,
+                          name: productLabel(item),
                           price: Number(item.price),
                         });
                     }}
@@ -718,7 +716,7 @@ export function TablePanel({
                     <span className="catalog-product-symbol">
                       <ProductPhotoImage product={item} decorative />
                     </span>
-                    <span className="catalog-product-name">{item.name}</span>
+                    <span className="catalog-product-name">{productLabel(item)}</span>
                     <StockHint catalog={catalog} cart={cart} productId={item.id} allowVariants />
                     <span className="catalog-product-description">
                       {item.description ||
@@ -745,7 +743,9 @@ export function TablePanel({
               (item: Data) =>
                 item.enabled &&
                 (!category || item.category_id === category) &&
-                item.name.toLowerCase().includes(search.toLowerCase()),
+                normalizeOrderSearch(productSearchText(item, catalog.variants)).includes(
+                  normalizeOrderSearch(search),
+                ),
             ) && <Empty>Nenhum produto encontrado. Tente outro nome ou categoria.</Empty>}
           </div>
         </aside>

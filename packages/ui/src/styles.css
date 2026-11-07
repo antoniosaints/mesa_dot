@@ -13,6 +13,8 @@
   font-weight: 600;
   font-synthesis: none;
   color-scheme: dark;
+  /* Keep the page width stable when content changes or a dialog locks the body. */
+  scrollbar-gutter: stable;
   --bg: #090e1a;
   --panel: #0e1525;
   --panel-hover: #131e32;
@@ -56,6 +58,40 @@
 }
 * {
   box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: var(--muted) transparent;
+}
+/* Fallback for engines without CSS Scrollbars support. Scrolling stays native. */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--muted);
+  border: 2px solid transparent;
+  border-radius: 8px;
+  background-clip: padding-box;
+}
+:is(
+  .modal,
+  .modal-body,
+  .product-editor-body,
+  .table-catalog-pane,
+  .table-operation-pane,
+  .table-summary-pane,
+  .receipt-preview,
+  .sidebar nav
+) {
+  scrollbar-gutter: stable;
+}
+@media (forced-colors: active) {
+  * {
+    scrollbar-color: auto;
+    scrollbar-width: auto;
+  }
 }
 body {
   margin: 0;
@@ -5735,6 +5771,7 @@ textarea {
   font-size: 12px;
   font-weight: 600;
   line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 .catalog-product-link small {
   color: var(--muted);

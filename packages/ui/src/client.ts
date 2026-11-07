@@ -1,6 +1,7 @@
 import type { PwaSurface } from '../../shared/src/pwa.js';
 import { pwaContext, tenantStorageKey, expectedUnitHeaders } from './pwa-context.js';
 import { io } from 'socket.io-client';
+import { beginApiRead } from './api-activity.js';
 export type Data = Record<string, any>;
 const base = (import.meta.env.VITE_API_URL ?? '') + '/api/v1';
 let storageKey = tenantStorageKey('bar-staff');
@@ -102,7 +103,19 @@ async function refreshStaffSession() {
   });
   return refreshPending;
 }
-export async function api(
+export async function api(...args: Parameters<typeof request>): Promise<any> {
+  const [, body, method] = args;
+  const finish =
+    (method ?? (body === undefined ? 'GET' : 'POST')).toUpperCase() === 'GET'
+      ? beginApiRead()
+      : () => {};
+  try {
+    return await request(...args);
+  } finally {
+    finish();
+  }
+}
+async function request(
   path: string,
   body?: unknown,
   method?: string,

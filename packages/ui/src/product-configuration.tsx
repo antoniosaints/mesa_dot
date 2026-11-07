@@ -10,6 +10,7 @@ import { normalizeStockQuantity, stockQuantity } from './stock-quantity.js';
 import { operationTime } from './operation-format.js';
 import { ProductHelp } from './product-ui.js';
 import { unitSymbol } from '../../shared/src/measurement-units.js';
+import { useStockLocationEditor } from './stock-location-editor.js';
 const movementNames: Record<string, string> = {
   PURCHASE: 'Compra',
   LOSS: 'Perda',
@@ -35,6 +36,7 @@ export function ProductStock({
   const forms = useFormDialog();
   const stockPage = useClientPagination<Data>(context.balances, context.product.id);
   const [locationsOpen, setLocationsOpen] = useState(false);
+  const locationEditor = useStockLocationEditor(context.locations, context.balances, refresh);
   const location = (id: string) =>
     context.locations.find((l: Data) => l.id === id)?.name ?? 'Local não identificado';
   const variant = (id: string) => {
@@ -178,7 +180,8 @@ export function ProductStock({
           Físico é a quantidade registrada; reservado é o saldo comprometido com pedidos. Disponível
           é o físico menos o reservado. O local de baixa é configurado em Estoque e produção.
           Variações compartilhadas usam o saldo do produto; variações com saldo próprio usam sua
-          linha específica. Nenhum saldo é transferido ao mudar essa configuração.
+          linha específica. Nenhum saldo é transferido ao mudar essa configuração. Para corrigir o
+          depósito de uma linha sem mudar suas quantidades, use Alterar local.
         </p>
       </details>
       {context.balances.length ? (
@@ -227,6 +230,19 @@ export function ProductStock({
                   <td data-label="Ações">
                     <div className="button-row">
                       {canAdjust && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            locationEditor.open(
+                              b,
+                              context.product.name + ' · ' + variant(b.variant_id),
+                            )
+                          }
+                        >
+                          <Icon name="folder" size={15} /> Alterar local
+                        </button>
+                      )}
+                      {canAdjust && (
                         <button type="button" onClick={() => adjust(b)}>
                           <Icon name="inventory" size={15} />
                           Movimentar
@@ -263,6 +279,7 @@ export function ProductStock({
         onPageSizeChange={stockPage.onPageSizeChange}
       />
       {forms.dialog}
+      {locationEditor.dialog}
       {locationsOpen && (
         <StockLocations
           locations={context.locations}
@@ -372,10 +389,11 @@ export function ProductMovements({
   const [type, setType] = useState('ALL');
   const [search, setSearch] = useState('');
 
-  const label = (id: string) => {
+  const label = (id: string, locationId?: string) => {
     const b = context.balances.find((b: Data) => b.id === id);
     return (
-      (context.locations.find((l: Data) => l.id === b?.location_id)?.name ?? 'Local') +
+      (context.locations.find((l: Data) => l.id === (locationId ?? b?.location_id))?.name ??
+        'Local') +
       ' · ' +
       ([...context.variants, ...(context.archived_variants ?? [])].find(
         (v: Data) => v.id === b?.variant_id,
@@ -389,7 +407,7 @@ export function ProductMovements({
     (m: Data) =>
       (!balance || m.balance_id === balance) &&
       (type === 'ALL' || m.type === type) &&
-      [m.reason, label(m.balance_id), movementNames[m.type]]
+      [m.reason, label(m.balance_id, m.location_id), movementNames[m.type]]
         .join(' ')
         .toLocaleLowerCase('pt-BR')
         .includes(search.toLocaleLowerCase('pt-BR')),
@@ -487,11 +505,13 @@ export function ProductMovements({
                         context.locations.find(
                           (l: Data) =>
                             l.id ===
-                            context.balances.find((b: Data) => b.id === m.balance_id)?.location_id,
+                            (m.location_id ??
+                              context.balances.find((b: Data) => b.id === m.balance_id)
+                                ?.location_id),
                         )?.color
                       }
                     >
-                      {label(m.balance_id)}
+                      {label(m.balance_id, m.location_id)}
                     </RecordTag>
                   </td>
                   <td data-label="Tipo">

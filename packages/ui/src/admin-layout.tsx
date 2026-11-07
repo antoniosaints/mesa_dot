@@ -1,5 +1,6 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Icon, useAppearance } from './appearance.js';
+import { MenuTransition, useMenuTransition } from './menu-transition.js';
 
 export function AppShell({
   sidebarOpen,
@@ -100,8 +101,17 @@ export function AppTopbar({ children }: { children: ReactNode }) {
 }
 
 /** Animate navigation without keying/remounting forms, queries or modal owners. */
-export function AppPageContent({ page, children }: { page: string; children: ReactNode }) {
+export function AppPageContent({
+  page,
+  label,
+  children,
+}: {
+  page: string;
+  label: string;
+  children: ReactNode;
+}) {
   const { interfaceStyle } = useAppearance();
+  const loading = useMenuTransition(page, interfaceStyle === 'erp');
   const content = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const element = content.current;
@@ -122,6 +132,7 @@ export function AppPageContent({ page, children }: { page: string; children: Rea
   }, [page, interfaceStyle]);
   return (
     <div className="page-content" ref={content}>
+      {loading && <MenuTransition label={label} />}
       {children}
     </div>
   );

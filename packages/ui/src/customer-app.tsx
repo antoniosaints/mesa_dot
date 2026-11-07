@@ -6,6 +6,7 @@ import {
   type CustomerTicketGroup,
 } from './customer-contexts.js';
 import { ProductPhotoImage } from './product-photo.js';
+import { productLabel, productSearchText } from './product-label.js';
 import { OnlinePaymentDialog } from './online-payment.js';
 import { CustomerConsumption } from './customer-consumption.js';
 import { NumericInput } from './numeric-input.js';
@@ -365,7 +366,7 @@ export function CustomerApp() {
       (category === 'all' || item.category_id === category) &&
       normalizeOrderSearch(
         [
-          item.name,
+          productSearchText(item, menu?.variants),
           item.description,
           menu?.categories.find((entry: Data) => entry.id === item.category_id)?.name,
         ]
@@ -687,13 +688,13 @@ export function CustomerApp() {
               {shownProducts.map((p: Data) => (
                 <button
                   className="menu-card"
-                  aria-label={p.name}
+                  aria-label={productLabel(p)}
                   disabled={busy}
                   key={p.id}
                   aria-disabled={!productHasStock(menu, cart, p.id)}
                   onClick={() => {
                     if (!productHasStock(menu, cart, p.id)) {
-                      toast.error('Sem estoque disponível para ' + p.name + '.');
+                      toast.error('Sem estoque disponível para ' + productLabel(p) + '.');
                       return;
                     }
                     setProduct(p);
@@ -707,7 +708,7 @@ export function CustomerApp() {
                     <ProductPhotoImage product={p} decorative />
                   </div>
                   <div>
-                    <h3>{p.name}</h3>
+                    <h3>{productLabel(p)}</h3>
                     <p>{p.description}</p>
                     <StockHint catalog={menu} cart={cart} productId={p.id} allowVariants />
                     <div className="section-head">
@@ -819,11 +820,6 @@ export function CustomerApp() {
                       <span className="customer-cart-line-quantity">{line.quantity}×</span>
                       <div>
                         <strong>{line.name}</strong>
-                        {line.variant_id && (
-                          <small>
-                            {menu?.variants.find((item: Data) => item.id === line.variant_id)?.name}
-                          </small>
-                        )}
                         {line.modifiers.length > 0 && (
                           <small>
                             {line.modifiers
@@ -1042,7 +1038,10 @@ export function CustomerApp() {
       </footer>
       {product && (
         <Modal
-          title={product.name}
+          title={productLabel(
+            product,
+            menu?.variants.find((item: Data) => item.id === variant)?.name,
+          )}
           className="customer-product-modal"
           dirty={Boolean(variant || modifiers.length || notes || productQuantity !== '1')}
           onClose={() => setProduct(null)}
@@ -1064,7 +1063,10 @@ export function CustomerApp() {
                 ...cart,
                 {
                   product_id: product.id,
-                  name: product.name,
+                  name: productLabel(
+                    product,
+                    menu?.variants.find((item: Data) => item.id === variant)?.name,
+                  ),
                   quantity: quantityNumber,
                   variant_id: variant,
                   modifiers,
@@ -1097,10 +1099,7 @@ export function CustomerApp() {
                   options={[
                     {
                       id: String(''),
-                      name:
-                        (product.default_variant_name ?? 'Padrão') +
-                        ' · ' +
-                        String(brl(product.price)),
+                      name: productLabel(product) + ' · ' + String(brl(product.price)),
                       disabled: remainingStock(menu, cart, product.id) < 1,
                     },
                     ...(menu?.variants
@@ -1108,7 +1107,7 @@ export function CustomerApp() {
                       .map((v: Data) => ({
                         id: String(v.id),
                         name:
-                          String(v.name) +
+                          productLabel(product, v.name) +
                           ' · ' +
                           String(brl(v.price)) +
                           (remainingStock(menu, cart, product.id, v.id) < 1

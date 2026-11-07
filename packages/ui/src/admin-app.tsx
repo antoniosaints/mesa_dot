@@ -558,7 +558,7 @@ export function AdminApp() {
                     <ThemeToggle />
                   </div>
                 </AppTopbar>
-                <AppPageContent page={page}>
+                <AppPageContent page={page} label={currentPage[2]}>
                   <Connectivity />
                   {page !== 'orders' &&
                     page !== 'menu' &&
